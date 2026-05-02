@@ -1,10 +1,11 @@
-import { createConfig, http } from "wagmi";
+import { createConfig, http, fallback } from "wagmi";
 import { baseSepolia, mainnet } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
 import { getDefaultConfig } from "connectkit";
 
 // Base Sepolia chain config (CoFHE-supported for FHE operations)
 // Chain ID: 84532
+// Use multiple CORS-friendly RPC endpoints with fallback
 
 type AnyWindow = Window & {
   ethereum?: Record<string, unknown> & { isMetaMask?: boolean; providers?: (Record<string, unknown> & { isMetaMask?: boolean })[] };
@@ -44,8 +45,15 @@ export const wagmiConfig = createConfig(
   getDefaultConfig({
     chains: [baseSepolia, mainnet],
     transports: {
-      [baseSepolia.id]: http("https://sepolia.base.org"),
-      [mainnet.id]: http(),
+      [baseSepolia.id]: fallback([
+        http("https://sepolia.base.org"),
+        http("https://base-sepolia-rpc.publicnode.com"),
+        http("https://base-sepolia.blockpi.network/v1/rpc/public"),
+      ]),
+      [mainnet.id]: fallback([
+        http("https://eth.llamarpc.com"),
+        http("https://ethereum-rpc.publicnode.com"),
+      ]),
     },
     connectors: [
       injected({ target: "metaMask" }),
