@@ -342,14 +342,17 @@ export default function RoomPage() {
         saveRoom(updatedRoom);
         setRoom(updatedRoom);
 
-        // 7. Show result in feed
+        // 7. Show brief success, then navigate to result page
         setFeed(prev => [...prev, {
           kind: "result_matched",
-          agreedPrice: "Prices compared on-chain",
+          agreedPrice: "FHE comparison complete. Loading results…",
           ts: Date.now(),
         }]);
 
         setSubmitStatus("done");
+
+        // Auto-navigate to result page after 2s
+        setTimeout(() => navigate(`/result/${id}`), 2000);
         return; // Success — exit loop
       } catch (err: any) {
         console.warn(`[RoomPage] Attempt ${attempt}/${MAX_ATTEMPTS} failed:`, err?.message);
@@ -373,7 +376,6 @@ export default function RoomPage() {
     setEncryptStep("Demo mode: simulating encrypted comparison");
 
     setTimeout(() => {
-      // Simulate the negotiation result
       setFeed(prev => [...prev.filter(e => e.kind !== "waiting_counterparty"),
         { kind: "counterparty_submitted", ciphertextPreview: "demo: encrypted locally", ts: Date.now() },
       ]);
@@ -389,11 +391,12 @@ export default function RoomPage() {
 
       setFeed(prev => [...prev, {
         kind: "result_matched",
-        agreedPrice: "Demo: prices compared locally (CoFHE testnet unavailable)",
+        agreedPrice: "Demo: comparison complete. Loading results…",
         ts: Date.now(),
       }]);
 
       setSubmitStatus("done");
+      setTimeout(() => navigate(`/result/${id}`), 2000);
     }, 2000);
   };
 
