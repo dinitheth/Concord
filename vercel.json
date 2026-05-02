@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd artifacts/concord && npm run build",
+  "buildCommand": "cd artifacts/concord && pnpm run build",
   "outputDirectory": "artifacts/concord/dist/public",
   "installCommand": "pnpm install",
   "framework": "vite",
