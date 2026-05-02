@@ -3,7 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Lock, Zap, CheckCircle2, XCircle, ArrowRight, Wallet,
-  Copy, Check, ShieldCheck, Users, AlertCircle, Hash,
+  Copy, Check, ShieldCheck, Users, AlertCircle, Hash, RefreshCw,
 } from "lucide-react";
 import { useAccount, usePublicClient, useWalletClient, useReadContract } from "wagmi";
 import { useModal } from "connectkit";
@@ -154,7 +154,9 @@ export default function RoomPage() {
   const [notFound, setNotFound] = useState(false);
   const [feed, setFeed] = useState<FeedEventType[]>([]);
   const [price, setPrice] = useState("");
-  const [submitStatus, setSubmitStatus] = useState<"idle" | "encrypting" | "computing" | "done">("idle");
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "encrypting" | "computing" | "done" | "error">("idle");
+  const [encryptStep, setEncryptStep] = useState("");
+  const [encryptError, setEncryptError] = useState("");
   const [codeCopied, setCodeCopied] = useState(false);
   const feedEndRef = useRef<HTMLDivElement>(null);
   const roomCode = id.startsWith("0x") ? roomIdToCode(id as `0x${string}`) : id.replace(/-/g, "").toUpperCase().slice(0, 3) + "·" + id.replace(/-/g, "").toUpperCase().slice(3, 6);
@@ -272,13 +274,32 @@ export default function RoomPage() {
   const handleSubmit = async () => {
     if (!room || !isValid || !walletConnected || isPartyA || !publicClient || !walletClient) return;
     setSubmitStatus("encrypting");
+    setEncryptStep("Initializing FHE");
+    setEncryptError("");
 
     try {
       // 1. Initialize FHE
       await initFHE(publicClient, walletClient);
+      setEncryptStep("Encrypting price");
 
-      // 2. Encrypt ceiling price with real CoFHE
-      const encrypted = await encryptPrice(BigInt(Math.round(parsedPrice)));
+      // 2. Encrypt ceiling price with real CoFHE (with 90s timeout)
+      const encryptWithTimeout = Promise.race([
+        encryptPrice(BigInt(Math.round(parsedPrice)), (progress) => {
+          const stepLabels: Record<string, string> = {
+            InitTfhe: "Loading TFHE engine",
+            FetchKeys: "Fetching FHE keys from network",
+            Pack: "Packing encrypted input",
+            Prove: "Generating ZK proof",
+            Verify: "Verifying with CoFHE network",
+          };
+          if (progress.isStart) {
+            setEncryptStep(stepLabels[progress.step] || progress.step);
+          }
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("FHE encryption timed out after 90 seconds. The CoFHE network may be slow. Please retry.")), 90000)),
+      ]) as Promise<any>;
+
+      const encrypted = await encryptWithTimeout;
       setSubmitStatus("computing");
 
       // 3. Send on-chain joinAndCompute transaction
@@ -324,9 +345,10 @@ export default function RoomPage() {
       }]);
 
       setSubmitStatus("done");
-    } catch (error) {
+    } catch (error: any) {
       console.error("[RoomPage] Submit error:", error);
-      setSubmitStatus("idle");
+      setEncryptError(error?.message || "Encryption failed. Please try again.");
+      setSubmitStatus("error");
     }
   };
 
@@ -496,11 +518,35 @@ export default function RoomPage() {
           )}
 
           {(submitStatus === "encrypting" || submitStatus === "computing") && (
-            <div className="flex items-center justify-center gap-2.5 py-3">
-              <div className="w-4 h-4 border-2 border-[#0a84ff]/30 border-t-[#0a84ff] rounded-full animate-spin" />
-              <span className="text-[13px] text-foreground/50">
-                {submitStatus === "encrypting" ? "Encrypting your price…" : "Submitting to the network…"}
-              </span>
+            <div className="flex flex-col items-center justify-center gap-2 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-4 h-4 border-2 border-[#0a84ff]/30 border-t-[#0a84ff] rounded-full animate-spin" />
+                <span className="text-[13px] text-foreground/50">
+                  {submitStatus === "encrypting" ? "Encrypting your price…" : "Submitting to the network…"}
+                </span>
+              </div>
+              {submitStatus === "encrypting" && encryptStep && (
+                <span className="text-[11px] text-foreground/30 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3 h-3" />
+                  {encryptStep}
+                </span>
+              )}
+              {submitStatus === "encrypting" && (
+                <span className="text-[10px] text-foreground/20 mt-1">First encryption may take 30-60 seconds</span>
+              )}
+            </div>
+          )}
+
+          {submitStatus === "error" && (
+            <div className="flex flex-col items-center gap-2.5 py-4">
+              <div className="text-[13px] text-[#ff453a]/80 text-center max-w-sm">{encryptError}</div>
+              <button
+                onClick={() => { setSubmitStatus("idle"); setEncryptError(""); }}
+                className="btn-apple px-5 py-2.5 text-[13px] flex items-center gap-2"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Retry
+              </button>
             </div>
           )}
         </div>
