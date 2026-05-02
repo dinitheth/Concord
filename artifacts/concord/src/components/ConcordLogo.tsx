@@ -13,7 +13,7 @@ export default function ConcordLogo({ size = 28, showText = true }: ConcordLogoP
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        {/* Left arc — seller (red) */}
+        {/* Left arc — initiator */}
         <path
           d="M13 6 C6 6 2 10.5 2 16 C2 21.5 6 26 13 26"
           stroke="#ff453a"
@@ -22,7 +22,7 @@ export default function ConcordLogo({ size = 28, showText = true }: ConcordLogoP
           fill="none"
           opacity="0.85"
         />
-        {/* Right arc — buyer (green) */}
+        {/* Right arc — counterparty */}
         <path
           d="M19 6 C26 6 30 10.5 30 16 C30 21.5 26 26 19 26"
           stroke="#30d158"

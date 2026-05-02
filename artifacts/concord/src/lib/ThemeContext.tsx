@@ -16,7 +16,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem("concord-theme");
     if (saved === "light" || saved === "dark") return saved;
-    return "light"; // Default to light mode
+    return "dark"; // Default to dark mode
   });
 
   useEffect(() => {

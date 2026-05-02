@@ -37,7 +37,7 @@ const steps = [
     icon: CheckCircle2,
     number: "04",
     title: "Result only. Numbers stay hidden.",
-    desc: "Deal or no-deal — and the midpoint if matched. That's all anyone learns. Both reservation prices remain private forever.",
+    desc: "Deal or no-deal, plus the midpoint if matched. That's all anyone learns. Both reservation prices remain private forever.",
     color: "#30d158",
     glow: "rgba(48,209,88,0.35)",
     ring: "rgba(48,209,88,0.2)",
@@ -45,9 +45,9 @@ const steps = [
 ];
 
 const useCases = [
-  { icon: Building2, title: "M&A", desc: "Seller floor $80M, buyer ceiling $95M — deal found at $87.5M. Neither price disclosed." },
-  { icon: TrendingUp, title: "Salary", desc: "Candidate wants $180K, company budgets $210K — match at $195K. Zero awkwardness." },
-  { icon: Home, title: "Real Estate", desc: "Seller's minimum $650K, buyer's max $700K — closes at $675K without a mediator." },
+  { icon: Building2, title: "M&A", desc: "Floor $80M, ceiling $95M. Deal found at $87.5M. Neither party's price disclosed." },
+  { icon: TrendingUp, title: "Salary", desc: "Candidate wants $180K, company budgets $210K. Match at $195K. Zero awkwardness." },
+  { icon: Home, title: "Real Estate", desc: "Minimum $650K, max offer $700K. Closes at $675K without a mediator." },
   { icon: Globe, title: "Bond Pricing", desc: "Private yield discovery with automatic settlement via ReineiraOS ConfidentialEscrow." },
 ];
 
@@ -95,7 +95,7 @@ function HowItWorks() {
             </div>
           )}
 
-          <div className="grid grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             {steps.map((step, i) => (
               <motion.div
                 key={i}
@@ -125,7 +125,7 @@ function HowItWorks() {
                       animate={inView ? { scale: 1, opacity: 1 } : {}}
                       transition={{ delay: 0.5 + i * 0.14, type: "spring", stiffness: 200 }}
                       className="absolute -top-1.5 -right-1 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold font-mono"
-                      style={{ background: "hsl(var(--card))", border: `1px solid ${step.ring}`, color: step.color }}
+                      style={{ background: "hsl(var(--card))", border: `1px solid ${step.ring}`, color: step.color, boxShadow: "var(--card-shadow)" }}
                     >
                       {step.number}
                     </motion.div>
@@ -225,10 +225,10 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.18, ease: [0.32, 0, 0, 1] }}
-            className="text-[19px] text-foreground/50 max-w-lg mx-auto mb-10 leading-relaxed"
+            className="text-[15px] sm:text-[17px] md:text-[19px] text-foreground/50 max-w-lg mx-auto mb-10 leading-relaxed"
             style={{ letterSpacing: "-0.01em" }}
           >
-            Two parties discover if they have a deal — and at what price — without either one ever revealing their number.
+            Two parties discover if they have a deal, and at what price, without either one ever revealing their number.
           </motion.p>
 
           <motion.div
@@ -277,11 +277,11 @@ export default function LandingPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.45, delay: i * 0.08 }}
-                className="apple-card p-5 hover:bg-[#2c2c2e] transition-colors duration-200"
+                className="apple-card p-5 transition-colors duration-200 theme-subtle-bg-hover"
               >
                 <div
                   className="w-9 h-9 rounded-xl flex items-center justify-center mb-4"
-                  style={{ background: "rgba(10,132,255,0.1)" }}
+                  style={{ background: "var(--blue-subtle-bg)" }}
                 >
                   <uc.icon className="w-4.5 h-4.5 text-[#0a84ff]" strokeWidth={2} />
                 </div>
@@ -318,17 +318,17 @@ export default function LandingPage() {
           >
           <div
             className="overflow-hidden rounded-2xl"
-            style={{ border: "1px solid rgba(255,255,255,0.07)" }}
+            style={{ border: "1px solid var(--card-border-color)" }}
           >
             {/* Table header */}
-            <div style={{ display: "grid", gridTemplateColumns: "200px 1fr 1fr 1fr", background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "200px 1fr 1fr 1fr", background: "var(--subtle-bg)", borderBottom: "1px solid var(--divider)" }}>
               <div className="px-5 py-4" />
               {[
                 { label: "Traditional Escrow", status: "Broken", statusColor: "#ff453a", statusBg: "rgba(255,69,58,0.1)", colBg: "rgba(255,69,58,0.03)" },
                 { label: "Zero-Knowledge Proofs", status: "Insufficient", statusColor: "#ffd60a", statusBg: "rgba(255,214,10,0.1)", colBg: "rgba(255,214,10,0.02)" },
                 { label: "Fhenix CoFHE", status: "The solution", statusColor: "#30d158", statusBg: "rgba(48,209,88,0.1)", colBg: "rgba(48,209,88,0.04)" },
               ].map((col, i) => (
-                <div key={i} className="px-5 py-4" style={{ background: col.colBg, borderLeft: "1px solid rgba(255,255,255,0.05)" }}>
+                <div key={i} className="px-5 py-4" style={{ background: col.colBg, borderLeft: "1px solid var(--divider)" }}>
                   <div className="inline-flex items-center gap-1.5 text-[10px] font-bold rounded-full px-2.5 py-0.5 mb-2" style={{ background: col.statusBg, color: col.statusColor }}>
                     {col.status}
                   </div>
@@ -343,7 +343,7 @@ export default function LandingPage() {
                 feature: "How it works",
                 vals: [
                   "Prices disclosed to a trusted third party who computes the match.",
-                  "Proves a single fact about one input — cannot process two secrets simultaneously.",
+                  "Proves a single fact about one input. Cannot process two secrets simultaneously.",
                   "Computes on both encrypted inputs at once. The result emerges; neither price is ever seen.",
                 ],
                 isText: true,
@@ -375,7 +375,7 @@ export default function LandingPage() {
             ].map((row, ri) => (
               <div
                 key={ri}
-                style={{ display: "grid", gridTemplateColumns: "200px 1fr 1fr 1fr", borderTop: "1px solid rgba(255,255,255,0.05)" }}
+                style={{ display: "grid", gridTemplateColumns: "200px 1fr 1fr 1fr", borderTop: "1px solid var(--divider)" }}
               >
                 <div className="px-5 py-4 flex items-center">
                   <span className="text-[12px] font-semibold text-foreground/40">{row.feature}</span>
@@ -385,7 +385,7 @@ export default function LandingPage() {
                   const checkColors: Record<string, string> = { good: "#30d158", bad: "#ff453a", warn: "#ffd60a" };
                   const check = row.isText ? null : row.checks![ci];
                   return (
-                    <div key={ci} className="px-5 py-4 flex items-center" style={{ background: colBgs[ci], borderLeft: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div key={ci} className="px-5 py-4 flex items-center" style={{ background: colBgs[ci], borderLeft: "1px solid var(--divider)" }}>
                       {row.isText ? (
                         <span className="text-[12px] text-foreground/40 leading-relaxed">{val}</span>
                       ) : (
@@ -412,10 +412,10 @@ export default function LandingPage() {
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="max-w-2xl mx-auto text-center apple-card p-14 dark:bg-gradient-to-br dark:from-[#1c1c1e] dark:to-[#111114]"
+          className="max-w-2xl mx-auto text-center apple-card p-8 sm:p-14"
         >
           <ShieldCheck className="w-10 h-10 text-[#0a84ff] mx-auto mb-5" strokeWidth={1.75} />
-          <h2 className="sf-display text-4xl text-foreground mb-3">Ready to find your deal?</h2>
+          <h2 className="sf-display text-2xl sm:text-4xl text-foreground mb-3">Ready to find your deal?</h2>
           <p className="text-foreground/45 text-[17px] mb-8">
             Both parties enter their price on one page. FHE computes the match. Done.
           </p>
@@ -433,7 +433,7 @@ export default function LandingPage() {
       <div className="separator" />
       <footer className="py-6 px-6 text-center">
         <p className="text-[12px] text-foreground/25">
-          Concord — Built for the Private By Design dApp Buildathon. Deployed on Arbitrum Sepolia testnet.
+          Concord. Built with <span style={{ color: "#0052ff", fontWeight: 600 }}>Base</span> & <span style={{ color: "#7B68EE", fontWeight: 600 }}>Fhenix CoFHE</span>. Fully homomorphic encryption for private price discovery.
         </p>
       </footer>
     </div>

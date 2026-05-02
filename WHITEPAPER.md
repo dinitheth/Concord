@@ -1,11 +1,11 @@
 # Concord — Blind Negotiation Protocol
 ## Technical Whitepaper
 
-**Version:** 2.0.0  
-**Date:** April 2026  
+**Version:** 3.0.0  
+**Date:** May 2026  
 **Network:** Base Sepolia (Fhenix CoFHE coprocessor)  
 **Contract:** `0xd7FA8ad77cfAa55674af496088f8D3723F9ff402`  
-**Buildathon:** Private By Design dApp Buildathon — Akindo / WaveHack
+**Built with:** Base & Fhenix CoFHE
 
 ---
 
@@ -43,8 +43,8 @@ Encrypt(A) OP Encrypt(B) → Encrypt(A OP B)
 For Concord, the critical operations are comparison, addition, division, and conditional selection:
 
 ```solidity
-euint64 floorEnc  = FHE.asEuint64(sellerEncryptedInput);
-euint64 ceilEnc   = FHE.asEuint64(buyerEncryptedInput);
+euint64 floorEnc  = FHE.asEuint64(initiatorEncryptedInput);
+euint64 ceilEnc   = FHE.asEuint64(counterpartyEncryptedInput);
 
 ebool   hasMatch  = FHE.gte(ceilEnc, floorEnc);      // ceiling >= floor?
 euint64 sum       = FHE.add(floorEnc, ceilEnc);       // sum in ciphertext
@@ -53,8 +53,8 @@ euint64 agreed    = FHE.select(hasMatch, mid, FHE.asEuint64(0)); // conditional
 ```
 
 **What is never revealed:**
-- The seller's floor price
-- The buyer's ceiling price
+- The initiator's floor price
+- The counterparty's ceiling price
 - The margin between prices
 - Any intermediate computation result
 
@@ -71,153 +71,219 @@ euint64 agreed    = FHE.select(hasMatch, mid, FHE.asEuint64(0)); // conditional
 
 Concord uses `euint64` for all price representation, supporting values up to 1.84 × 10¹⁹.
 
-### 2.3 Client-Side Encryption
+### 2.3 Client-Side Encryption Pipeline
 
-Prices are encrypted entirely on the user's device:
+Prices are encrypted entirely on the user's device via the `@cofhe/sdk` (v0.5.2). The encryption runs 5 stages:
 
-1. User enters price in the browser
-2. Encrypted locally via `@cofhe/sdk` using the CoFHE network's public key
-3. Serialized as an `InEuint64` containing `ctHash`, `securityZone`, `utype`, and `signature`
-4. Submitted as transaction calldata on Base Sepolia
+| Stage | Operation | Duration | Description |
+|-------|-----------|----------|-------------|
+| 1 | **InitTfhe** | ~2-4s | Downloads TFHE WebAssembly engine (cached after first use) |
+| 2 | **FetchKeys** | ~1-2s | Fetches the FHE public key from the CoFHE threshold network |
+| 3 | **Pack** | <1ms | Packs the plaintext number into TFHE ciphertext format |
+| 4 | **Prove** | ~10-15s | Generates a ZK proof that the encryption is valid (CPU intensive) |
+| 5 | **Verify** | ~1-2s | CoFHE verifier network validates the proof and signs it |
 
-**No server, no relay, no intermediary ever sees the plaintext.**
+**Total time:** ~15-25 seconds (first run); ~12-18 seconds (subsequent, WASM cached).
+
+The output is an `InEuint64` structure containing `{ctHash, securityZone, utype, signature}`, which is submitted as transaction calldata. The plaintext number never appears in any network transmission.
+
+### 2.4 Without FHE vs With FHE
+
+#### Without FHE (conventional smart contract)
+```solidity
+uint64 partyAPrice = 80000000; // ← Visible on-chain to everyone
+uint64 partyBPrice = 95000000; // ← Visible on-chain to everyone
+bool matched = partyBPrice >= partyAPrice; // Everyone sees true
+uint64 agreed = (partyAPrice + partyBPrice) / 2; // Everyone sees $87.5M
+```
+**Problem**: Any blockchain explorer shows both prices. Party B knows Party A would accept $80M.
+
+#### With Fhenix CoFHE (this contract)
+```solidity
+euint64 partyAPrice = FHE.asEuint64(encFloor);  // Encrypted blob
+euint64 partyBPrice = FHE.asEuint64(encCeiling); // Encrypted blob
+ebool matched = FHE.gte(partyBPrice, partyAPrice); // Encrypted boolean
+euint64 agreed = FHE.select(matched, midpoint, FHE.asEuint64(0)); // Encrypted result
+```
+**Result**: Same computation, same answer — but **zero information leaked**.
 
 ---
 
-## 3. Protocol Architecture
+## 3. Smart Contract Architecture
 
-### 3.1 Protocol Lifecycle
+### 3.1 BlindNegotiation.sol
 
-```
-┌───────────────┬────────────────────────────────────────────────┐
-│    Phase      │  Description                                    │
-├───────────────┼────────────────────────────────────────────────┤
-│  1. Room      │  Seller creates room, submits enc(floor) to    │
-│  Creation     │  BlindNegotiation on Base Sepolia.              │
-├───────────────┼────────────────────────────────────────────────┤
-│  2. Invite    │  Seller sends on-chain invite to buyer's        │
-│               │  wallet address via sendInvite().               │
-│               │  No external messaging required.                │
-├───────────────┼────────────────────────────────────────────────┤
-│  3. Buyer     │  Buyer sees invite in their on-chain Inbox,     │
-│  Submission   │  joins room, submits enc(ceiling).              │
-├───────────────┼────────────────────────────────────────────────┤
-│  4. FHE       │  joinAndCompute() executes the full FHE        │
-│  Computation  │  circuit: gte → add → div → select.            │
-│               │  Results stored as encrypted values.            │
-├───────────────┼────────────────────────────────────────────────┤
-│  5. Reveal    │  Threshold decryption reveals only the         │
-│               │  match bit and midpoint price.                  │
-├───────────────┼────────────────────────────────────────────────┤
-│  6. Settlement│  Optional: ConfidentialEscrow locks the        │
-│               │  agreed amount in encrypted escrow.             │
-└───────────────┴────────────────────────────────────────────────┘
-```
-
-### 3.2 Smart Contract
-
-#### BlindNegotiation.sol (Base Sepolia)
-
-Deployed at `0xd7FA8ad77cfAa55674af496088f8D3723F9ff402`.
+Deployed at `0xd7FA8ad77cfAa55674af496088f8D3723F9ff402` on Base Sepolia.
 
 ```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import "@fhenixprotocol/cofhe-contracts/FHE.sol";
+
 contract BlindNegotiation {
+
     enum RoomStatus { Open, PendingB, Computing, Settled, Expired }
 
     struct Room {
-        address partyAAddress;
-        address partyBAddress;
-        euint64 partyAPrice;     // encrypted floor
-        euint64 partyBPrice;     // encrypted ceiling
-        ebool   matched;         // FHE comparison result
-        euint64 agreedPrice;     // FHE midpoint if matched
+        address partyAAddress;     // Plaintext address of Initiator
+        address partyBAddress;     // Plaintext address of Counterparty
+        euint64 partyAPrice;       // Encrypted floor (never decrypted on-chain)
+        euint64 partyBPrice;       // Encrypted ceiling (never decrypted on-chain)
+        ebool   matched;           // FHE comparison result (encrypted boolean)
+        euint64 agreedPrice;       // FHE midpoint if matched (encrypted)
         RoomStatus status;
         uint256 createdAt;
         uint256 deadline;
-        uint8 negotiationType;
+        uint8 negotiationType;     // 0=M&A, 1=Salary, 2=RealEstate, 3=Custom
     }
 
-    // On-chain invite system
     struct Invite {
         bytes32 roomId;
         address sender;
         uint256 timestamp;
         uint8 negotiationType;
     }
-
-    // Core functions
-    function createRoom(bytes32 roomId, InEuint64 calldata encFloor,
-                        uint8 nType, uint256 deadline) external;
-
-    function sendInvite(bytes32 roomId, address recipient) external;
-
-    function joinAndCompute(bytes32 roomId,
-                            InEuint64 calldata encCeiling) external;
-
-    function publishResult(bytes32 roomId, bool _matched,
-                           uint64 _agreedPrice) external;
-
-    // View functions
-    function getRoomInfo(bytes32 roomId) external view returns (
-        address partyA, address partyB, RoomStatus status,
-        uint256 createdAt, uint256 deadline, uint8 negotiationType,
-        bool isResultPublished, bool matched, uint64 agreedPrice
-    );
-
-    function getReceivedInvites(address) external view returns (Invite[] memory);
-    function getReceivedInviteCount(address) external view returns (uint256);
 }
 ```
 
-### 3.3 On-Chain Invite System
+### 3.2 Contract Functions — Detailed Breakdown
 
-Concord uses a fully on-chain invite system — no XMTP, email, or external services required:
+#### `createRoom(bytes32 roomId, InEuint64 calldata encFloor, uint8 nType, uint256 deadline)`
+
+Called by the **Initiator** (Party A) to create a negotiation room.
+
+1. Validates room doesn't exist, deadline is in the future, negotiation type is valid
+2. Calls `FHE.asEuint64(encFloor)` — validates the ZK proof from the client SDK and converts the encrypted input into an on-chain FHE ciphertext handle
+3. Calls `FHE.allowSender(room.partyAPrice)` — grants the sender permission to decrypt this value later
+4. Calls `FHE.allowThis(room.partyAPrice)` — grants the contract permission to use this value in FHE operations
+5. Sets room status to `PendingB`
+
+**What's stored on-chain:** The `euint64` is a ciphertext handle — a reference to encrypted data managed by the CoFHE coprocessor. If you inspect the blockchain, you see something like `0xa3f7c2d8e1...` — completely meaningless without the FHE secret key (which is split across the Threshold Network and held by nobody individually).
+
+#### `sendInvite(bytes32 roomId, address recipient)`
+
+Fully on-chain invite system. The initiator sends an invite to the counterparty's wallet address. The invite is stored in `receivedInvites[recipient]` and `sentInvites[sender]` mappings. No XMTP, email, or external services required.
+
+#### `joinAndCompute(bytes32 roomId, InEuint64 calldata encCeiling)`
+
+Called by the **Counterparty** (Party B). This is where the FHE magic happens:
+
+```solidity
+// Store Party B's encrypted ceiling
+room.partyBPrice = FHE.asEuint64(encCeiling);
+
+// ── CORE FHE COMPUTATION ──────────────────────────
+// Step 1: Is there a deal? (ceiling >= floor)
+// Both operands are encrypted. The RESULT is also encrypted.
+ebool hasMatch = FHE.gte(room.partyBPrice, room.partyAPrice);
+
+// Step 2: Compute midpoint in encrypted space
+// 80M + 95M = 175M, but ALL numbers remain ciphertext
+euint64 encSum = FHE.add(room.partyAPrice, room.partyBPrice);
+euint64 encMidpoint = FHE.div(encSum, FHE.asEuint64(2));
+
+// Step 3: Conditional — midpoint only if match, else encrypted zero
+// Even the BRANCH DECISION is encrypted
+euint64 encAgreed = FHE.select(hasMatch, encMidpoint, FHE.asEuint64(0));
+// ──────────────────────────────────────────────────
+
+// Grant both parties access to decrypt the results
+FHE.allow(room.matched, room.partyAAddress);
+FHE.allow(room.matched, room.partyBAddress);
+FHE.allow(room.agreedPrice, room.partyAAddress);
+FHE.allow(room.agreedPrice, room.partyBAddress);
+```
+
+**Critical insight:** The EVM executed `>=`, `+`, `/`, and `if/else` on two numbers it **never saw**. At no point during execution does the contract, the node operator, or any observer have access to the plaintext values.
+
+#### `publishResult(bytes32 roomId, bool _matched, uint64 _agreedPrice)`
+
+After threshold decryption (off-chain via CoFHE SDK), either party can publish the decrypted result on-chain for permanent storage.
+
+#### `getEncryptedResult(bytes32 roomId)`
+
+Returns the FHE ciphertext handles (`euint64 encAgreedPrice`, `ebool encMatched`) for client-side decryption via the CoFHE SDK's `decryptForView()` API. Only callable by room parties (`onlyParty` modifier).
+
+### 3.3 On-Chain Invite System
 
 | Step | Action | On-Chain Function |
 |------|--------|-------------------|
-| 1 | Seller creates room | `createRoom()` |
-| 2 | Seller invites buyer by wallet address | `sendInvite(roomId, buyerAddress)` |
-| 3 | Buyer's frontend polls for new invites | `getReceivedInviteCount(address)` |
-| 4 | Buyer opens inbox and sees all invites | `getReceivedInvites(address)` |
-| 5 | Buyer joins room and submits ceiling | `joinAndCompute(roomId, encCeiling)` |
-
-Invites are stored in mappings: `receivedInvites[address]` and `sentInvites[address]`.
+| 1 | Initiator creates room | `createRoom()` |
+| 2 | Initiator invites counterparty | `sendInvite(roomId, address)` |
+| 3 | Counterparty's frontend polls | `getReceivedInviteCount(address)` |
+| 4 | Counterparty opens inbox | `getReceivedInvites(address)` |
+| 5 | Counterparty joins and computes | `joinAndCompute(roomId, encCeiling)` |
 
 ---
 
-## 4. Data Flow
+## 4. Protocol Lifecycle
+
+```
+┌───────────────┬─────────────────────────────────────────────────────┐
+│    Phase      │  Description                                        │
+├───────────────┼─────────────────────────────────────────────────────┤
+│  1. Room      │  Initiator creates room, submits enc(floor) to      │
+│  Creation     │  BlindNegotiation on Base Sepolia.                   │
+├───────────────┼─────────────────────────────────────────────────────┤
+│  2. Invite    │  Initiator sends on-chain invite to counterparty's   │
+│               │  wallet address via sendInvite().                    │
+│               │  No external messaging required.                     │
+├───────────────┼─────────────────────────────────────────────────────┤
+│  3. Counter-  │  Counterparty sees invite in their on-chain Inbox,   │
+│  party Submit │  joins room, submits enc(ceiling).                   │
+├───────────────┼─────────────────────────────────────────────────────┤
+│  4. FHE       │  joinAndCompute() executes the full FHE circuit:     │
+│  Computation  │  gte → add → div → select.                          │
+│               │  Results stored as encrypted values on-chain.        │
+├───────────────┼─────────────────────────────────────────────────────┤
+│  5. Result    │  On-chain status set to Settled. Both parties can    │
+│               │  view the result via the Concord frontend.           │
+├───────────────┼─────────────────────────────────────────────────────┤
+│  6. Settlement│  Future: ConfidentialEscrow locks the agreed amount  │
+│  (Coming Soon)│  in encrypted escrow powered by CoFHE.               │
+└───────────────┴─────────────────────────────────────────────────────┘
+```
+
+---
+
+## 5. Data Flow
 
 ```
 USER DEVICE (Browser)
-┌────────────────────────────────────────────────────────────┐
-│  plaintext_price ─► @cofhe/sdk encryptInputs()            │
-│                          │                                │
-│                   InEuint64 {ctHash, securityZone, sig}   │
-└──────────────────────────┼────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  plaintext_price → @cofhe/sdk encryptInputs()                │
+│                          │                                    │
+│    5 steps: InitTfhe → FetchKeys → Pack → Prove → Verify     │
+│                          │                                    │
+│                   InEuint64 {ctHash, securityZone, sig}       │
+└──────────────────────────┼───────────────────────────────────┘
                            │ signed tx (calldata = ciphertext)
                            ▼
 BASE SEPOLIA (CoFHE Coprocessor)
-┌────────────────────────────────────────────────────────────┐
-│  BlindNegotiation.createRoom(encFloor)                     │
-│   └─► stores euint64 partyAPrice (never decrypted)        │
-│                                                            │
-│  BlindNegotiation.sendInvite(roomId, buyerAddress)         │
-│   └─► stores invite on-chain for buyer                    │
-│                                                            │
-│  BlindNegotiation.joinAndCompute(encCeiling)               │
-│   └─► FHE.gte(ceiling, floor) ─► ebool matched            │
-│   └─► FHE.add + FHE.div ─► euint64 midpoint               │
-│   └─► FHE.select(matched, mid, 0) ─► euint64 result       │
-│                                                            │
-│  Threshold decryption ─► match bit + agreed price          │
-└────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  BlindNegotiation.createRoom(encFloor)                        │
+│   └─► FHE.asEuint64() validates ZK proof                     │
+│   └─► stores euint64 partyAPrice (never decrypted)           │
+│                                                               │
+│  BlindNegotiation.sendInvite(roomId, counterpartyAddress)     │
+│   └─► stores invite on-chain for counterparty                │
+│                                                               │
+│  BlindNegotiation.joinAndCompute(encCeiling)                  │
+│   └─► FHE.gte(ceiling, floor) → ebool matched                │
+│   └─► FHE.add + FHE.div → euint64 midpoint                   │
+│   └─► FHE.select(matched, mid, 0) → euint64 result           │
+│   └─► FHE.allow(result, partyA) + FHE.allow(result, partyB)  │
+│                                                               │
+│  Status: Settled — FHE comparison complete                    │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 5. Security Model
+## 6. Security Model
 
-### 5.1 Threat Model
+### 6.1 Threat Model
 
 | Threat Actor          | Attack Vector                   | Mitigation                                       |
 |-----------------------|---------------------------------|--------------------------------------------------|
@@ -226,52 +292,54 @@ BASE SEPOLIA (CoFHE Coprocessor)
 | MEV searcher          | Front-run submission             | Price data is ciphertext; ordering doesn't help  |
 | Colluding counterparty| Share ciphertext with decryptor  | Threshold decryption requires network quorum     |
 
-### 5.2 Security Properties
+### 6.2 Security Properties
 
 - **Input Privacy**: Neither party's price is revealed at any computational step
 - **Correctness**: FHE comparison is cryptographically sound — the result cannot be forged
 - **Fairness**: Both submissions must be received before comparison
 - **Deadline Enforcement**: Room expiry is enforced on-chain
 - **Invite Privacy**: Invites contain only room IDs and wallet addresses — no price data
+- **Access Control**: `FHE.allow()` ensures only authorized parties can decrypt specific ciphertext handles
 
 ---
 
-## 6. Protocol Variants
+## 7. Protocol Variants
 
-| Type            | Party A               | Party B                    | Unit        |
-|-----------------|-----------------------|----------------------------|-------------|
-| M&A Deal        | Floor (min exit)      | Ceiling (max acquisition)  | USD millions|
-| Salary          | Floor (min salary)    | Ceiling (max budget)       | USD annual  |
-| Real Estate     | Floor (min ask)       | Ceiling (max bid)          | USD         |
-| Custom Deal     | Floor (custom)        | Ceiling (custom)           | Custom      |
+| Type            | Initiator (Party A)     | Counterparty (Party B)       | Unit        |
+|-----------------|-------------------------|------------------------------|-------------|
+| M&A Deal        | Floor (min exit)        | Ceiling (max acquisition)    | USD millions|
+| Salary          | Floor (min salary)      | Ceiling (max budget)         | USD annual  |
+| Real Estate     | Floor (min ask)         | Ceiling (max bid)            | USD         |
+| Custom Deal     | Floor (custom)          | Ceiling (custom)             | Custom      |
 
 The FHE logic is identical across all types — only metadata and UX framing differ.
 
 ---
 
-## 7. Frontend Architecture
+## 8. Frontend Architecture
 
 ```
 artifacts/concord/src/
 ├── pages/
-│   ├── LandingPage.tsx    # Protocol overview and entry point
-│   ├── RoleSelectPage.tsx # Seller vs Buyer selection
-│   ├── CreateRoom.tsx     # Seller: set floor, encrypt, send invite
-│   ├── JoinRoom.tsx       # Buyer: enter room code
-│   ├── InboxPage.tsx      # On-chain invite inbox (received/sent)
-│   ├── RoomPage.tsx       # Live negotiation room with on-chain polling
-│   ├── ResultPage.tsx     # Deal/no-deal outcome + settlement
-│   └── NegotiatePage.tsx  # Interactive protocol demo
+│   ├── LandingPage.tsx      # Protocol overview and entry point
+│   ├── RoleSelectPage.tsx   # Initiator vs Counterparty selection
+│   ├── CreateRoom.tsx       # Initiator: set floor, encrypt, create room
+│   ├── JoinRoom.tsx         # Counterparty: enter room code
+│   ├── InboxPage.tsx        # On-chain invite inbox
+│   ├── RoomPage.tsx         # Live negotiation room with on-chain polling
+│   ├── ResultPage.tsx       # Deal/no-deal outcome + settlement
+│   ├── NegotiatePage.tsx    # Interactive protocol demo
+│   └── ContractPage.tsx     # Contract explorer and verification
 ├── components/
-│   ├── NavBar.tsx         # Navigation + wallet state + invite notifications
-│   ├── WalletModal.tsx    # MetaMask / OKX / Rabby connector
-│   ├── FHEBadge.tsx       # Encryption status badge
+│   ├── NavBar.tsx           # Navigation + wallet state + invite badges
+│   ├── WalletModal.tsx      # MetaMask / OKX / Rabby connector
+│   ├── FHEBadge.tsx         # Encryption status badge
 │   └── ParticleBackground.tsx  # Ambient visual effect
 └── lib/
-    ├── contracts.ts       # ABI, addresses, room ID utilities
-    ├── concord.ts         # Room state, negotiation types, localStorage
-    ├── fhe.ts             # FHE encryption wrapper (@cofhe/sdk)
-    └── wagmi-config.ts    # Wallet connectors and chain config
+    ├── contracts.ts         # ABI, addresses, room ID utilities
+    ├── concord.ts           # Room state, negotiation types, localStorage
+    ├── fhe.ts               # CoFHE SDK wrapper (encrypt, decrypt, permits)
+    └── wagmi-config.ts      # Wallet connectors and chain config
 ```
 
 ### Design System
@@ -285,53 +353,30 @@ Apple Human Interface Guidelines for dark-mode web:
 - **Danger**: `#ff453a` (iOS red)
 - **Typography**: SF Pro / Inter system font stack
 - **Glass**: `backdrop-filter: saturate(180%) blur(20px)` for overlays
-
----
-
-## 8. Roadmap
-
-### Phase 1 — Buildathon (Current)
-- [x] Full FHE UI flow with CoFHE integration
-- [x] On-chain room creation and invite system
-- [x] Real-time seller/buyer state synchronization via blockchain polling
-- [x] Apple dark design system
-- [x] Wallet connection (MetaMask, OKX, Rabby)
-- [x] On-chain inbox with notification badges
-
-### Phase 2 — Production
-- [ ] Full threshold decryption integration
-- [ ] ConfidentialEscrow settlement
-- [ ] Gas optimization and batched operations
-- [ ] Multi-asset settlement (ETH, ERC-20)
-
-### Phase 3 — Scale
-- [ ] Security audit
-- [ ] IPFS frontend deployment
-- [ ] ENS integration for counterparty addressing
-- [ ] SDK for third-party integration
+- **Responsive**: Fully mobile-responsive from 320px to 4K
 
 ---
 
 ## 9. Formal Definition
 
 Let:
-- `p_A ∈ ℕ` = Seller's reservation price (private)
-- `p_B ∈ ℕ` = Buyer's reservation price (private)
+- `p_A ∈ ℕ` = Initiator's reservation price (private)
+- `p_B ∈ ℕ` = Counterparty's reservation price (private)
 - `E(x)` = FHE encryption under Fhenix network public key
 - `D(c)` = Threshold decryption by Fhenix network
 
 **Protocol:**
 
 ```
-1. Party A submits: C_A = E(p_A)
-2. Seller invites Party B on-chain: sendInvite(roomId, addressB)
-3. Party B submits: C_B = E(p_B)
+1. Initiator submits: C_A = E(p_A)
+2. Initiator invites Counterparty on-chain: sendInvite(roomId, addressB)
+3. Counterparty submits: C_B = E(p_B)
 4. Contract computes homomorphically:
-   a. C_match = FHE.gte(C_B, C_A)
-   b. C_sum   = FHE.add(C_A, C_B)
-   c. C_mid   = FHE.div(C_sum, E(2))
+   a. C_match  = FHE.gte(C_B, C_A)
+   b. C_sum    = FHE.add(C_A, C_B)
+   c. C_mid    = FHE.div(C_sum, E(2))
    d. C_result = FHE.select(C_match, C_mid, E(0))
-5. Threshold decrypt: match = D(C_match), price = D(C_result)
+5. Status → Settled. FHE comparison complete on-chain.
 ```
 
 **Privacy guarantee:**
@@ -341,4 +386,4 @@ For any PPT adversary observing `C_A`, `C_B`, and `(match, price)`, the adversar
 
 *Concord is open-source software released under the MIT License.*
 
-*Built for the Private By Design dApp Buildathon — Akindo / WaveHack, 2026.*
+*Built with Base & Fhenix CoFHE. Fully homomorphic encryption for private price discovery.*

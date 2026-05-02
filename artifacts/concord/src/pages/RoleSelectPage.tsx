@@ -21,11 +21,11 @@ export default function RoleSelectPage() {
           <div className="flex items-center justify-center gap-2.5 mb-6">
             <FHEBadge label="Fhenix CoFHE" />
           </div>
-          <h1 className="sf-display text-[36px] text-foreground mb-3 leading-tight">
+          <h1 className="sf-display text-[28px] sm:text-[36px] text-foreground mb-3 leading-tight">
             Start a negotiation
           </h1>
           <p className="text-[15px] text-foreground/40 leading-relaxed">
-            Both parties set their price privately. FHE computes whether a deal exists — no one sees the other's number.
+            Both parties set their price privately. FHE computes whether a deal exists. No one sees the other's number.
           </p>
         </motion.div>
 
@@ -87,7 +87,7 @@ export default function RoleSelectPage() {
               <ArrowRight className="w-5 h-5 text-foreground/20 group-hover:text-[#30d158] group-hover:translate-x-1 transition-all duration-200" />
             </div>
             <p className="text-[13px] text-foreground/40 leading-relaxed mb-5">
-              Enter the room code you received. Set your maximum price — it stays encrypted on-device — and the result is computed automatically.
+              Enter the room code you received. Set your maximum price, it stays encrypted on-device, and the result is computed automatically.
             </p>
             <div className="space-y-2">
               {["Enter the room code you received", "Set your ceiling price (encrypted)", "Result: deal or no deal"].map((step, i) => (

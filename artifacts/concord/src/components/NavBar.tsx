@@ -15,7 +15,7 @@ function ThemeToggle() {
       onClick={toggleTheme}
       className="flex items-center justify-center p-1.5 rounded-full transition-all duration-200 shrink-0"
       style={{
-        background: "rgba(128,128,128,0.1)",
+        background: "var(--subtle-bg)",
         color: "hsl(var(--foreground))",
       }}
       aria-label="Toggle theme"
@@ -39,8 +39,8 @@ function WalletButton() {
         onClick={() => setOpen(true)}
         className="flex items-center gap-1.5 px-2 flex-shrink-0 sm:px-2.5 py-1.5 rounded-full transition-all duration-200 shrink-0"
         style={{
-          background: "rgba(48,209,88,0.08)",
-          border: "1px solid rgba(48,209,88,0.2)",
+          background: "var(--green-subtle-bg)",
+          border: "1px solid var(--green-subtle-border)",
           color: "hsl(var(--foreground))", opacity: 0.75,
         }}
       >
@@ -60,8 +60,8 @@ function WalletButton() {
       onClick={() => setOpen(true)}
       className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-full transition-all duration-200 shrink-0 whitespace-nowrap flex-shrink-0"
       style={{
-        background: "rgba(128,128,128,0.05)",
-        border: "1px solid rgba(128,128,128,0.15)",
+        background: "var(--subtle-bg)",
+        border: "1px solid var(--card-border-color)",
         color: "hsl(var(--foreground))",
       }}
     >
@@ -87,14 +87,14 @@ export default function NavBar() {
   const unread = Number(inviteCount ?? 0);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 glass" style={{ borderBottom: "0.5px solid hsl(var(--))", background: "hsl(var(--background))", opacity: 0.9 }}>
+    <nav className="fixed top-0 left-0 right-0 z-50 glass">
       <div className="max-w-5xl mx-auto px-3 sm:px-4 h-12 flex items-center justify-between gap-1.5 sm:gap-2">
         <Link href="/" className="shrink-0 flex-shrink-0">
           <ConcordLogo size={22} showText={true} />
         </Link>
 
         <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
-          <Link href="/negotiate" className="hidden md:block text-[13px] text-foreground/50 hover:text-foreground transition-colors font-medium shrink-0">
+          <Link href="/negotiate" className="hidden md:block text-[13px] hover:text-foreground transition-colors font-medium shrink-0" style={{ color: "var(--text-secondary)" }}>
             How it Works
           </Link>
 
@@ -103,8 +103,8 @@ export default function NavBar() {
             <button
               className="relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-full transition-all duration-200"
               style={{
-                background: location === "/inbox" ? "rgba(120,80,255,0.15)" : "rgba(128,128,128,0.05)",
-                border: location === "/inbox" ? "1px solid rgba(120,80,255,0.35)" : "1px solid rgba(128,128,128,0.15)",
+                background: location === "/inbox" ? "var(--purple-subtle-bg)" : "var(--subtle-bg)",
+                border: location === "/inbox" ? "1px solid var(--purple-subtle-border)" : "1px solid var(--card-border-color)",
                 color: location === "/inbox" ? "#a78bfa" : "hsl(var(--foreground))",
                 opacity: location === "/inbox" ? 1 : 0.7
               }}
@@ -114,7 +114,7 @@ export default function NavBar() {
               {unread > 0 && (
                 <span
                   className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center animate-pulse"
-                  style={{ background: "#ff453a", color: "hsl(var(--foreground))" }}
+                  style={{ background: "#ff453a", color: "#fff" }}
                 >
                   {unread > 9 ? "9+" : unread}
                 </span>
@@ -134,5 +134,3 @@ export default function NavBar() {
     </nav>
   );
 }
-
-

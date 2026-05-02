@@ -147,9 +147,9 @@ function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: stri
                 onClick={handleCopy}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
                 style={{
-                  background: copied ? "rgba(48,209,88,0.15)" : "rgba(255,255,255,0.07)",
-                  border: copied ? "1px solid rgba(48,209,88,0.3)" : "1px solid rgba(255,255,255,0.12)",
-                  color: copied ? "#30d158" : "rgba(255,255,255,0.6)"
+                  background: copied ? "rgba(48,209,88,0.15)" : "var(--subtle-bg)",
+                  border: copied ? "1px solid rgba(48,209,88,0.3)" : "1px solid var(--card-border-color)",
+                  color: copied ? "#30d158" : "var(--text-secondary)"
                 }}
               >
                 {copied ? <><Check className="w-3 h-3" />Copied</> : <><Copy className="w-3 h-3" />Copy</>}
@@ -184,7 +184,7 @@ function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: stri
             onClick={handleCopy}
             className="flex-1 py-3 text-[13px] flex items-center justify-center gap-2 rounded-xl font-semibold transition-all"
             style={{
-              background: "rgba(255,255,255,0.06)",
+              background: "var(--subtle-bg)",
               border: "1px solid hsl(var(--))",
               color: "hsl(var(--foreground))", opacity: 0.7
             }}
@@ -286,7 +286,7 @@ export default function InboxPage() {
                 onClick={refresh}
                 disabled={loading}
                 className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
-                style={{ background: "hsl(var(--secondary))", border: "1px solid rgba(255,255,255,0.08)" }}
+                style={{ background: "hsl(var(--secondary))", border: "1px solid var(--card-border-color)" }}
               >
                 <RefreshCw className={`w-4 h-4 text-foreground/40 ${loading ? "animate-spin" : ""}`} />
               </button>
@@ -309,7 +309,7 @@ export default function InboxPage() {
         {/* Tabs */}
         <div
           className="flex rounded-2xl p-1 mb-6"
-          style={{ background: "hsl(var(--secondary))", border: "1px solid rgba(255,255,255,0.07)" }}
+          style={{ background: "hsl(var(--secondary))", border: "1px solid var(--card-border-color)" }}
         >
           {[
             { id: "received", label: "Received", icon: Inbox, count: received.length },
@@ -322,7 +322,7 @@ export default function InboxPage() {
               style={{
                 background: tab === t.id ? "rgba(120,80,255,0.18)" : "transparent",
                 border: tab === t.id ? "1px solid rgba(120,80,255,0.3)" : "1px solid transparent",
-                color: tab === t.id ? "#a78bfa" : "rgba(255,255,255,0.38)",
+                color: tab === t.id ? "#a78bfa" : "var(--text-secondary)",
                 fontSize: 13, fontWeight: 600
               }}
             >
@@ -332,8 +332,8 @@ export default function InboxPage() {
                 <span
                   className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                   style={{
-                    background: tab === t.id ? "rgba(120,80,255,0.3)" : "rgba(255,255,255,0.08)",
-                    color: tab === t.id ? "#a78bfa" : "rgba(255,255,255,0.35)"
+                    background: tab === t.id ? "rgba(120,80,255,0.3)" : "var(--subtle-bg)",
+                    color: tab === t.id ? "#a78bfa" : "var(--text-tertiary)"
                   }}
                 >
                   {t.count}
@@ -352,7 +352,7 @@ export default function InboxPage() {
                 <div className="text-center py-12">
                   <div
                     className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+                    style={{ background: "var(--subtle-bg)", border: "1px solid var(--card-border-color)" }}
                   >
                     <Lock className="w-6 h-6 text-foreground/20" />
                   </div>
@@ -370,13 +370,13 @@ export default function InboxPage() {
                 <div className="text-center py-12">
                   <div
                     className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+                    style={{ background: "var(--subtle-bg)", border: "1px solid var(--card-border-color)" }}
                   >
                     <Inbox className="w-6 h-6 text-foreground/20" />
                   </div>
                   <p className="text-[16px] font-semibold text-foreground/50 mb-2">No invites yet</p>
                   <p className="text-[13px] text-foreground/25 max-w-xs mx-auto leading-relaxed">
-                    When a seller sends you an on-chain encrypted invite, it will appear here. Decrypt it to reveal the room code.
+                    When an initiator sends you an on-chain encrypted invite, it will appear here. Decrypt it to reveal the room code.
                   </p>
                 </div>
               ) : (
@@ -408,7 +408,7 @@ export default function InboxPage() {
                 <div className="text-center py-16">
                   <div
                     className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+                    style={{ background: "var(--subtle-bg)", border: "1px solid var(--card-border-color)" }}
                   >
                     <Send className="w-6 h-6 text-foreground/20" />
                   </div>
@@ -456,7 +456,7 @@ export default function InboxPage() {
 
                       <div
                         className="rounded-xl px-4 py-3 mb-4"
-                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+                        style={{ background: "var(--subtle-bg)", border: "1px solid var(--card-border-color)" }}
                       >
                         <p className="text-[10px] font-bold text-foreground/25 uppercase tracking-widest mb-1">Room Code</p>
                         <div className="font-mono text-[26px] font-bold text-foreground tracking-widest">

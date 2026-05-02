@@ -258,7 +258,7 @@ export default function ContractPage() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           {[
             { key: "contract" as const, label: "BlindNegotiation.sol", icon: Code2, color: "text-primary" },
             { key: "reineira" as const, label: "ReineiraOS Escrow", icon: Shield, color: "text-accent" },
@@ -317,7 +317,7 @@ export default function ContractPage() {
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-4">
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="card-dark p-4">
             <h3 className="text-sm font-semibold mb-2 text-primary">FHE Operations Used</h3>
             <div className="space-y-1.5 text-xs font-mono">

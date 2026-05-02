@@ -156,9 +156,9 @@ export default function NegotiatePage() {
             <FHEBadge label="Fhenix CoFHE" />
             <FHEBadge variant="reineira" label="ReineiraOS" />
           </div>
-          <h1 className="sf-display text-[40px] text-foreground mb-2">How it Works</h1>
+          <h1 className="sf-display text-[28px] sm:text-[36px] md:text-[40px] text-foreground mb-2">How it Works</h1>
           <p className="text-[15px] text-foreground/45 max-w-lg mx-auto leading-relaxed">
-            Both parties enter their number independently. FHE computes the match in encrypted space — neither side ever sees the other's price.
+            Both parties enter their number independently. FHE computes the match in encrypted space. Neither side ever sees the other's price.
           </p>
 
           <div className="flex items-center justify-center gap-3 mt-6">
@@ -205,7 +205,7 @@ export default function NegotiatePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <DemoPanel
             role="A"
-            label="Party A — Seller"
+            label="Party A: Initiator"
             fieldLabel={meta.partyALabel}
             colorAccent="#0a84ff"
             price={priceA}
@@ -216,7 +216,7 @@ export default function NegotiatePage() {
           />
           <DemoPanel
             role="B"
-            label="Party B — Buyer"
+            label="Party B: Counterparty"
             fieldLabel={meta.partyBLabel}
             colorAccent="#5ac8fa"
             price={priceB}
@@ -249,7 +249,7 @@ export default function NegotiatePage() {
                   <h3 className="text-[15px] font-semibold text-foreground sf-headline">
                     {computeState === "done" ? "Computation Complete" : "Computing in Encrypted Space…"}
                   </h3>
-                  <p className="text-[12px] text-foreground/35">Fhenix CoFHE — no value is ever decrypted during computation</p>
+                  <p className="text-[12px] text-foreground/35">Fhenix CoFHE. No value is ever decrypted during computation</p>
                 </div>
               </div>
               <div className="space-y-2">
@@ -333,12 +333,12 @@ export default function NegotiatePage() {
                   </>
                 ) : (
                   <p className="text-[15px] text-foreground/45 max-w-sm mx-auto leading-relaxed mt-1">
-                    No overlap detected. Zero information leaked — neither party learned anything about the other's number.
+                    No overlap detected. Zero information leaked. Neither party learned anything about the other's number.
                   </p>
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-2.5 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
                 {[
                   { label: "Party A's floor", value: "Never revealed", color: "#ff453a" },
                   { label: "Party B's ceiling", value: "Never revealed", color: "#ff453a" },

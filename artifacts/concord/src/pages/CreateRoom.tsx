@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lock, Check, Copy, Wallet, ShieldCheck, ArrowRight, Send, Calendar, Bell, ChevronDown, Activity, Zap, Fingerprint, FileText, CheckCircle2, User } from "lucide-react";
-import { useAccount, useDisconnect, usePublicClient, useWalletClient, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useDisconnect, usePublicClient, useWalletClient } from "wagmi";
 import { useModal } from "connectkit";
 import NavBar from "@/components/NavBar";
 import FHEBadge from "@/components/FHEBadge";
@@ -63,7 +63,7 @@ export default function CreateRoom() {
   // Identity
   const [displayName, setDisplayName] = useState("");
 
-  // Notification — buyer wallet address for on-chain encrypted invite
+  // Notification — counterparty wallet address for on-chain encrypted invite
   const [notifyXmtpAddr, setNotifyXmtpAddr] = useState("");
 
   const meta = NEGOTIATION_TYPES[type];
@@ -78,7 +78,6 @@ export default function CreateRoom() {
   // Wagmi hooks for contract interaction
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
-  const { writeContractAsync } = useWriteContract();
   const [txHash, setTxHash] = useState<string>("");
   const [encryptStep, setEncryptStep] = useState<string>("");
 
@@ -107,7 +106,14 @@ export default function CreateRoom() {
   };
 
   const handleCreate = async () => {
-    if (!isValid || !walletConnected || !publicClient || !walletClient) return;
+    if (!isValid || !walletConnected) {
+      console.warn("[CreateRoom] Missing price or wallet connection");
+      return;
+    }
+    if (!publicClient || !walletClient) {
+      alert("Wallet is still initializing. Please wait a moment and try again.");
+      return;
+    }
     setEncStatus("encrypting");
     setFHEStatus("encrypting");
     setEncryptStep("Connecting…");
@@ -138,12 +144,16 @@ export default function CreateRoom() {
       // 6. Map negotiation type to uint8
       const typeMap: Record<NegotiationType, number> = { ma: 0, salary: 1, realestate: 2, custom: 3 };
 
-      // 7. Send on-chain transaction
-      const hash = await writeContractAsync({
+      // 7. Send on-chain transaction — use walletClient directly (viem) instead of
+      //    wagmi's writeContractAsync which can go stale after the ~2min encryption.
+      setEncryptStep("Sending transaction…");
+      const hash = await walletClient.writeContract({
         address: BLIND_NEGOTIATION_ADDRESS,
         abi: BLIND_NEGOTIATION_ABI,
         functionName: "createRoom",
         args: [roomIdHex, encrypted.encryptedInput, typeMap[type], deadlineTs],
+        chain: walletClient.chain,
+        account: walletClient.account,
       });
       setTxHash(hash);
 
@@ -162,10 +172,19 @@ export default function CreateRoom() {
         txHash: hash,
       });
       setEncStatus("done");
-    } catch (error) {
+    } catch (error: any) {
       console.error("[CreateRoom] Error:", error);
+      // Show user-friendly error for common failures
+      if (error?.message?.includes("ProviderNotFound") || error?.message?.includes("Provider not found")) {
+        alert("Wallet connection was lost during encryption. Please reconnect your wallet and try again.");
+      } else if (error?.message?.includes("User rejected") || error?.message?.includes("user rejected")) {
+        // User cancelled the tx in their wallet — just reset silently
+      } else if (error?.message?.includes("ZK_VERIFY_FAILED")) {
+        alert("FHE proof verification failed. This may be a temporary network issue. Please try again.");
+      }
       setFHEStatus("idle");
       setEncStatus("idle");
+      setEncryptStep("");
     }
   };
 
@@ -179,12 +198,15 @@ export default function CreateRoom() {
     try {
       // roomId is already the roomIdHex (bytes32) — use it directly
       if (!roomId || !roomId.startsWith("0x")) throw new Error("Room ID not available");
+      if (!walletClient) throw new Error("Wallet not connected");
 
-      await writeContractAsync({
+      await walletClient.writeContract({
         address: BLIND_NEGOTIATION_ADDRESS,
         abi: BLIND_NEGOTIATION_ABI,
         functionName: "sendInvite",
         args: [roomId as `0x${string}`, recipientInput.trim() as `0x${string}`],
+        chain: walletClient.chain,
+        account: walletClient.account,
       });
       setXmtpState("sent");
     } catch (err) {
@@ -238,17 +260,17 @@ export default function CreateRoom() {
             <div style={{ position: "fixed", bottom: "-20%", right: "-10%", width: "50%", height: "50%", borderRadius: "50%", background: "rgba(22,78,99,0.08)", filter: "blur(150px)", pointerEvents: "none" }} />
             <div style={{ position: "fixed", top: "20%", right: "10%", width: "30%", height: "30%", borderRadius: "50%", background: "rgba(88,28,135,0.06)", filter: "blur(120px)", pointerEvents: "none" }} />
 
-            <div style={{ position: "relative", zIndex: 10, maxWidth: 1280, margin: "0 auto", padding: "48px 24px 40px" }}>
+            <div style={{ position: "relative", zIndex: 10, maxWidth: 1280, margin: "0 auto", padding: "48px 16px 40px" }}>
               {/* Page title row */}
-              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 40 }}>
-                <h1 className="sf-display" style={{ fontSize: 32, fontWeight: 800, color: "hsl(var(--foreground))", margin: 0, letterSpacing: "-0.02em" }}>Start a negotiation</h1>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 40, flexWrap: "wrap" }}>
+                <h1 className="sf-display" style={{ fontSize: "clamp(24px, 5vw, 32px)", fontWeight: 800, color: "hsl(var(--foreground))", margin: 0, letterSpacing: "-0.02em" }}>Start a negotiation</h1>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(10,132,255,0.08)", border: "1px solid rgba(10,132,255,0.2)", padding: "5px 14px", borderRadius: 50, fontSize: 12, fontWeight: 500, color: "#5ac8fa" }}>
                   <Lock style={{ width: 13, height: 13 }} />
                   End-to-end encrypted
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "7fr 5fr", gap: 28 }}>
+              <div className="concord-create-main-grid">
 
                 {/* ═══ LEFT COLUMN: Deal Setup ═══ */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -591,25 +613,29 @@ export default function CreateRoom() {
                         <div style={{
                           position: "absolute", inset: -4,
                           background: "linear-gradient(90deg, #22d3ee, #3b82f6)",
-                          borderRadius: 16, filter: "blur(12px)", opacity: (!isValid || !walletConnected) ? 0 : 0.2,
+                          borderRadius: 16, filter: "blur(12px)", opacity: (!isValid || !walletConnected || !publicClient || !walletClient) ? 0 : 0.2,
                           transition: "opacity 0.5s", pointerEvents: "none",
                         }} />
                         <button
                           onClick={() => setShowConfirm(true)}
-                          disabled={!isValid || !walletConnected || encStatus === "encrypting"}
+                          disabled={!isValid || !walletConnected || !publicClient || !walletClient || encStatus === "encrypting"}
                           style={{
                             position: "relative", width: "100%", padding: "16px 24px",
                             borderRadius: 14, fontSize: 15, fontWeight: 700,
-                            background: (!isValid || !walletConnected) ? "hsl(var(--secondary))" : "hsl(var(--primary))",
-                            color: (!isValid || !walletConnected) ? "hsl(var(--muted-foreground))" : "hsl(var(--primary-foreground))", border: "1px solid hsl(var(--border))",
-                            cursor: (!isValid || !walletConnected || encStatus === "encrypting") ? "not-allowed" : "pointer",
-                            opacity: (!isValid || !walletConnected) ? 0.7 : 1,
+                            background: (!isValid || !walletConnected || !publicClient || !walletClient) ? "hsl(var(--secondary))" : "hsl(var(--primary))",
+                            color: (!isValid || !walletConnected || !publicClient || !walletClient) ? "hsl(var(--muted-foreground))" : "hsl(var(--primary-foreground))", border: "1px solid hsl(var(--border))",
+                            cursor: (!isValid || !walletConnected || !publicClient || !walletClient || encStatus === "encrypting") ? "not-allowed" : "pointer",
+                            opacity: (!isValid || !walletConnected || !publicClient || !walletClient) ? 0.7 : 1,
                             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                             transition: "all 0.3s",
                           }}
                         >
                           {encStatus === "encrypting" ? (
                             <><div style={{ width: 16, height: 16, border: "2px solid hsl(var(--muted-foreground))", borderTop: "2px solid white", borderRadius: "50%" }} className="animate-spin" />{encryptStep || "Encrypting..."}</>
+                          ) : !walletConnected ? (
+                            <><Wallet style={{ width: 15, height: 15 }} />Connect Wallet to Continue</>
+                          ) : (!publicClient || !walletClient) ? (
+                            <><div style={{ width: 15, height: 15, border: "2px solid hsl(var(--muted-foreground))", borderTop: "2px solid white", borderRadius: "50%" }} className="animate-spin" />Initializing Wallet…</>
                           ) : (
                             <><Lock style={{ width: 15, height: 15 }} />Review and Encrypt Room</>
                           )}
@@ -652,7 +678,7 @@ export default function CreateRoom() {
                   </motion.div>
                   <div>
                     <h2 className="sf-display" style={{ fontSize: 20, color: "hsl(var(--foreground))", lineHeight: 1.2, margin: 0 }}>Floor locked</h2>
-                    <p style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", margin: 0 }}>Share the room code — your buyer enters it to submit their price.</p>
+                    <p style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", margin: 0 }}>Share the room code — your counterparty enters it to submit their price.</p>
                   </div>
                 </div>
                 {/* Room code pill inline */}
@@ -709,8 +735,8 @@ export default function CreateRoom() {
 
                   <div style={{ height: 1, background: "hsl(var(--muted-foreground))", margin: "14px 0" }} />
 
-                  {/* Seller identity */}
-                  <div style={LABEL_STYLE}>Seller</div>
+                  {/* Initiator identity */}
+                  <div style={LABEL_STYLE}>Initiator</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 12, background: "rgba(48,209,88,0.05)", border: "1px solid rgba(48,209,88,0.12)" }}>
                     <div style={{ width: 30, height: 30, borderRadius: "50%", background: "rgba(10,132,255,0.15)", border: "1px solid rgba(10,132,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <span style={{ fontSize: 10, fontWeight: 800, color: "#0a84ff" }}>{walletAddr.slice(2, 4).toUpperCase()}</span>
@@ -724,7 +750,7 @@ export default function CreateRoom() {
                   {/* Notification method */}
                   <div style={{ marginTop: 14, fontSize: 11, color: "hsl(var(--muted-foreground))", display: "flex", alignItems: "center", gap: 6 }}>
                     <Bell style={{ width: 11, height: 11 }} />
-                    {notifyXmtpAddr ? `On-Chain invite → ${notifyXmtpAddr.slice(0, 10)}…` : "No buyer address — share code manually"}
+                    {notifyXmtpAddr ? `On-Chain invite → ${notifyXmtpAddr.slice(0, 10)}…` : "No counterparty address — share code manually"}
                   </div>
                 </div>
 
@@ -912,7 +938,7 @@ export default function CreateRoom() {
                   </div>
                 )}
 
-                {/* Seller identity */}
+                {/* Initiator identity */}
                 {displayName && (
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Your Identity</span>
@@ -935,10 +961,10 @@ export default function CreateRoom() {
                   <span style={{ fontSize: 20, fontWeight: 800, color: "hsl(var(--foreground))", fontFamily: "monospace" }}>${price} <span style={{ fontSize: 12, fontWeight: 500, color: "hsl(var(--muted-foreground))" }}>USD</span></span>
                 </div>
 
-                {/* Buyer address */}
+                {/* Counterparty address */}
                 {notifyXmtpAddr && (
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Buyer Wallet</span>
+                    <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Counterparty Wallet</span>
                     <span style={{ fontSize: 12, fontFamily: "monospace", color: "hsl(var(--foreground))", opacity: 0.7 }}>{notifyXmtpAddr.slice(0,10)}…{notifyXmtpAddr.slice(-4)}</span>
                   </div>
                 )}
