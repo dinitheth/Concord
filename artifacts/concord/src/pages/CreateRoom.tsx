@@ -678,20 +678,8 @@ export default function CreateRoom() {
                   </motion.div>
                   <div>
                     <h2 className="sf-display" style={{ fontSize: 20, color: "hsl(var(--foreground))", lineHeight: 1.2, margin: 0 }}>Floor locked</h2>
-                    <p style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", margin: 0 }}>Share the room code — your counterparty enters it to submit their price.</p>
+                    <p style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", margin: 0 }}>Your floor price is securely encrypted on-chain. Invite your counterparty to begin.</p>
                   </div>
-                </div>
-                {/* Room code pill inline */}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                  <div className="font-mono" style={{ fontSize: 26, fontWeight: 800, color: "hsl(var(--foreground))", letterSpacing: "0.15em", padding: "8px 20px", borderRadius: 12, background: "rgba(10,132,255,0.08)", border: "1px solid rgba(10,132,255,0.2)" }}>
-                    {roomCode}
-                  </div>
-                  <button
-                    onClick={copyCode}
-                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", borderRadius: 50, fontSize: 12, fontWeight: 600, background: codeCopied ? "rgba(48,209,88,0.12)" : "hsl(var(--secondary))", border: codeCopied ? "1px solid rgba(48,209,88,0.3)" : "1px solid hsl(var(--border))", color: codeCopied ? "#30d158" : "hsl(var(--foreground))", cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap" }}
-                  >
-                    {codeCopied ? <><Check style={{ width: 12, height: 12 }} />Copied</> : <><Copy style={{ width: 12, height: 12 }} />Copy code</>}
-                  </button>
                 </div>
               </div>
 
