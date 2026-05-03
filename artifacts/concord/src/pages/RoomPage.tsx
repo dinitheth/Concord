@@ -469,20 +469,8 @@ export default function RoomPage() {
             </div>
           </div>
 
-          {!isSettled && (
-            <div className="mt-3 flex items-center gap-2.5 px-3 py-2 rounded-xl" style={{ background: "rgba(10,132,255,0.05)", border: "1px solid rgba(10,132,255,0.12)" }}>
-              <Hash className="w-3.5 h-3.5 text-foreground/25 shrink-0" />
-              <span className="font-mono text-[14px] font-bold text-foreground tracking-widest">{roomCode}</span>
-              <span className="text-[11px] text-foreground/25">room code</span>
-              <button
-                onClick={copyCode}
-                className="ml-auto flex items-center gap-1.5 text-[11px] font-semibold transition-colors"
-                style={{ color: codeCopied ? "#30d158" : "#0a84ff" }}
-              >
-                {codeCopied ? <><Check className="w-3.5 h-3.5" />Copied</> : <><Copy className="w-3.5 h-3.5" />Copy code</>}
-              </button>
-            </div>
-          )}
+
+
         </div>
 
         {/* Chat feed */}
