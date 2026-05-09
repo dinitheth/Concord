@@ -46,6 +46,7 @@ export default function CreateRoom() {
   const [ciphertext, setCiphertext] = useState("");
   const [roomId, setRoomId] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
+  const [roomConfirmed, setRoomConfirmed] = useState(false); // true once createRoom tx is mined
 
   // Step 2 invite
   const [recipientInput, setRecipientInput] = useState("");
@@ -205,9 +206,18 @@ export default function CreateRoom() {
         deadline: Number(deadlineTs) * 1000,
         txHash: hash,
       });
-      // Persist last completed room so we can restore floor-lock UI on return
       localStorage.setItem("concord_last_room", roomIdHex);
+
+      // Show Floor Locked UI immediately (optimistic) so user can see progress
       setEncStatus("done");
+      setRoomConfirmed(false); // room tx still pending
+
+      // Wait for the createRoom tx to be mined BEFORE enabling the invite button.
+      // This prevents sendInvite from failing with "Room does not exist" revert.
+      setEncryptStep("Confirming room on-chain…");
+      await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
+      setRoomConfirmed(true);
+      setEncryptStep("");
     } catch (error: any) {
       console.error("[CreateRoom] Error:", error);
       // Show user-friendly error for common failures
@@ -242,7 +252,7 @@ export default function CreateRoom() {
     setXmtpState("sending");
     setXmtpError("");
     try {
-      // Send invite tx
+      // Send invite tx — explicit gas bypasses estimation failure if room not yet indexed
       const hash = await walletClient.writeContract({
         address: BLIND_NEGOTIATION_ADDRESS,
         abi: BLIND_NEGOTIATION_ABI,
@@ -250,8 +260,9 @@ export default function CreateRoom() {
         args: [roomId as `0x${string}`, recipient as `0x${string}`],
         chain: walletClient.chain,
         account: walletClient.account,
+        gas: 200_000n, // explicit limit — sidesteps gas estimation revert
       });
-      // Wait for confirmation so we know the room existed on-chain
+      // Wait for confirmation
       await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
       setXmtpState("sent");
     } catch (err: any) {
@@ -284,6 +295,7 @@ export default function CreateRoom() {
     setCiphertext("");
     setFHEStatus("idle");
     setRoomId("");
+    setRoomConfirmed(false);
     setRecipientInput("");
     setXmtpState("idle");
     setXmtpError("");
@@ -865,14 +877,23 @@ export default function CreateRoom() {
                           {xmtpError}
                         </div>
                       )}
+                      {/* Waiting for room confirmation */}
+                      {!roomConfirmed && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, fontSize: 11, color: "hsl(var(--muted-foreground))", padding: "7px 10px", borderRadius: 8, background: "rgba(10,132,255,0.06)", border: "1px solid rgba(10,132,255,0.15)" }}>
+                          <div style={{ width: 10, height: 10, border: "2px solid rgba(10,132,255,0.3)", borderTop: "2px solid #0a84ff", borderRadius: "50%", flexShrink: 0 }} className="animate-spin" />
+                          Waiting for room to be confirmed on-chain…
+                        </div>
+                      )}
                       <button
                         onClick={sendInviteOnChain}
-                        disabled={!recipientInput.trim() || xmtpState === "sending"}
+                        disabled={!recipientInput.trim() || xmtpState === "sending" || !roomConfirmed}
                         className="btn-apple"
-                        style={{ width: "100%", padding: "12px", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: !recipientInput.trim() ? 0.35 : 1, cursor: !recipientInput.trim() || xmtpState === "sending" ? "not-allowed" : "pointer" }}
+                        style={{ width: "100%", padding: "12px", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (!recipientInput.trim() || !roomConfirmed) ? 0.35 : 1, cursor: (!recipientInput.trim() || xmtpState === "sending" || !roomConfirmed) ? "not-allowed" : "pointer" }}
                       >
                         {xmtpState === "sending" ? (
                           <><div style={{ width: 14, height: 14, border: "2px solid hsl(var(--muted-foreground))", borderTop: "2px solid white", borderRadius: "50%" }} className="animate-spin" />Sending — check your wallet…</>
+                        ) : !roomConfirmed ? (
+                          <>Confirming room on-chain…</>
                         ) : (
                           <><Send style={{ width: 13, height: 13 }} />Send On-Chain Invite</>
                         )}
