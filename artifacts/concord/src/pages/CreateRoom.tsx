@@ -866,8 +866,8 @@ export default function CreateRoom() {
                     </motion.div>
                   )}
 
-
-                  {/* Actions */}
+                  {/* ── Actions ────────────────────────────────── */}
+                  <div style={{ height: 1, background: "hsl(var(--border))", margin: "20px 0 16px" }} />
                   <button onClick={() => navigate(`/room/${roomId}`)} className="btn-apple" style={{ width: "100%", padding: "13px", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
                     Open Room <ArrowRight style={{ width: 15, height: 15 }} />
                   </button>
