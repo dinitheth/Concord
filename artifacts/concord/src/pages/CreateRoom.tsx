@@ -7,7 +7,7 @@ import { useModal } from "connectkit";
 import NavBar from "@/components/NavBar";
 import FHEBadge from "@/components/FHEBadge";
 import EncryptionVisualizer from "@/components/EncryptionVisualizer";
-import { NEGOTIATION_TYPES, saveRoom, type NegotiationType } from "@/lib/concord";
+import { NEGOTIATION_TYPES, saveRoom, getRoom, type NegotiationType } from "@/lib/concord";
 import { encryptPrice, initFHE, type FHEStatus, type EncryptProgress } from "@/lib/fhe";
 // On-chain invites — no external messaging service needed
 import { BLIND_NEGOTIATION_ABI, BLIND_NEGOTIATION_ADDRESS, generateRoomIdBytes32, roomIdToCode, getExplorerTxUrl } from "@/lib/contracts";
@@ -80,6 +80,20 @@ export default function CreateRoom() {
   const { data: walletClient } = useWalletClient();
   const [txHash, setTxHash] = useState<string>("");
   const [encryptStep, setEncryptStep] = useState<string>("");
+
+  // ── Restore floor-lock state when navigating back from DepositPage ──
+  // If there's a completed room in localStorage, restore the done view.
+  React.useEffect(() => {
+    const lastRoomId = localStorage.getItem("concord_last_room");
+    if (!lastRoomId || encStatus !== "idle") return;
+    const savedRoom = getRoom(lastRoomId);
+    if (!savedRoom) return;
+    setRoomId(lastRoomId);
+    if (savedRoom.myPrice) setPrice(String(savedRoom.myPrice));
+    if (savedRoom.type) setType(savedRoom.type as NegotiationType);
+    if (savedRoom.txHash) setTxHash(savedRoom.txHash);
+    setEncStatus("done");
+  }, []);
 
   // ── Eagerly connect FHE client when wallet connects ─────────────
   // connect() is lightweight (~100ms) — just registers chain + wallet.
@@ -166,11 +180,14 @@ export default function CreateRoom() {
         type,
         label: meta.label,
         status: "pending_b",
+        myPrice: Number(price),   // Store floor price so DepositPage can pre-fill it
         partyA: { address: walletAddr, timestamp: Date.now() },
         createdAt: Date.now(),
         deadline: Number(deadlineTs) * 1000,
         txHash: hash,
       });
+      // Persist last completed room so we can restore floor-lock UI on return
+      localStorage.setItem("concord_last_room", roomIdHex);
       setEncStatus("done");
     } catch (error: any) {
       console.error("[CreateRoom] Error:", error);
@@ -236,6 +253,7 @@ export default function CreateRoom() {
     setDeadline("");
     setDisplayName("");
     setNotifyXmtpAddr("");
+    localStorage.removeItem("concord_last_room"); // Clear so DepositPage skip goes to blank form
   };
 
   return (

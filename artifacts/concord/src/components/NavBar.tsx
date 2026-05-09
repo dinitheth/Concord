@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Inbox, Wallet, Sun, Moon } from "lucide-react";
+import { Inbox, Wallet, Sun, Moon, User } from "lucide-react";
 import { useAccount, useReadContract } from "wagmi";
 import { useModal } from "connectkit";
 import ConcordLogo from "@/components/ConcordLogo";
@@ -119,6 +119,22 @@ export default function NavBar() {
                   {unread > 9 ? "9+" : unread}
                 </span>
               )}
+            </button>
+          </Link>
+
+          {/* Profile */}
+          <Link href="/profile" className="shrink-0 flex-shrink-0">
+            <button
+              className="relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-full transition-all duration-200"
+              style={{
+                background: location === "/profile" ? "rgba(10,132,255,0.1)" : "var(--subtle-bg)",
+                border: location === "/profile" ? "1px solid rgba(10,132,255,0.3)" : "1px solid var(--card-border-color)",
+                color: location === "/profile" ? "#0a84ff" : "hsl(var(--foreground))",
+                opacity: location === "/profile" ? 1 : 0.7
+              }}
+            >
+              <User className="w-3.5 h-3.5 shrink-0" />
+              <span className="text-[12px] font-medium hidden sm:inline">Profile</span>
             </button>
           </Link>
 

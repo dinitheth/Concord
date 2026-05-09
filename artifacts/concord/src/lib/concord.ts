@@ -8,6 +8,7 @@ export interface Room {
   type: NegotiationType;
   label: string;
   status: RoomStatus;
+  myPrice?: number;   // Party A's floor price (local only, never sent on-chain)
   partyA?: {
     address: string;
     timestamp: number;

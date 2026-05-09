@@ -13,6 +13,7 @@ import ResultPage from "@/pages/ResultPage";
 import ContractPage from "@/pages/ContractPage";
 import InboxPage from "@/pages/InboxPage";
 import DepositPage from "@/pages/DepositPage";
+import ProfilePage from "@/pages/ProfilePage";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/contract" component={ContractPage} />
       <Route path="/inbox" component={InboxPage} />
       <Route path="/deposit/:id" component={DepositPage} />
+      <Route path="/profile" component={ProfilePage} />
       <Route component={NotFound} />
     </Switch>
   );
