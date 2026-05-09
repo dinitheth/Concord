@@ -84,30 +84,39 @@ export default function DepositPage() {
   const escrowStatus = escrowData ? Number((escrowData as any).status) : EscrowStatus.None;
   const alreadyDeposited = escrowStatus !== EscrowStatus.None;
 
-  // Write: Approve USDC
-  const { writeContract: approveUsdc, data: approveTxHash, isPending: isApproving } = useWriteContract();
-  const { isLoading: isApproveLoading, isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({ hash: approveTxHash });
+  // Write: Approve USDC — guard with enabled so it doesn't fire prematurely
+  const { writeContract: approveUsdc, data: approveTxHash, isPending: isApproving, reset: resetApprove } = useWriteContract();
+  const { isLoading: isApproveLoading, isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({
+    hash: approveTxHash,
+    query: { enabled: !!approveTxHash }, // CRITICAL: prevents false-positive loading state
+  });
 
   // Write: Deposit Escrow
-  const { writeContract: depositEscrow, data: depositTxHash, isPending: isDepositing } = useWriteContract();
-  const { isLoading: isDepositLoading, isSuccess: isDepositSuccess } = useWaitForTransactionReceipt({ hash: depositTxHash });
+  const { writeContract: depositEscrow, data: depositTxHash, isPending: isDepositing, reset: resetDeposit } = useWriteContract();
+  const { isLoading: isDepositLoading, isSuccess: isDepositSuccess } = useWaitForTransactionReceipt({
+    hash: depositTxHash,
+    query: { enabled: !!depositTxHash }, // CRITICAL: prevents false-positive loading state
+  });
 
   // After deposit confirmed — go back to floor lock page
   useEffect(() => {
     if (isDepositSuccess) {
       setStep("done");
-      // Short delay then navigate back to floor lock (CreateRoom)
       setTimeout(() => navigate("/create"), 2200);
     }
   }, [isDepositSuccess]);
 
-  // After approval confirmed — proceed to deposit
+  // After approval confirmed — call depositEscrow DIRECTLY (avoid stale closure from handleDeposit())
   useEffect(() => {
-    if (isApproveSuccess) {
-      refetchAllowance();
-      setStep("depositing");
-      handleDeposit();
-    }
+    if (!isApproveSuccess || !sellerAddress || amountBigInt === 0n) return;
+    refetchAllowance();
+    setStep("depositing");
+    depositEscrow({
+      address: CONFIDENTIAL_ESCROW_ADDRESS,
+      abi: CONFIDENTIAL_ESCROW_ABI,
+      functionName: "depositEscrow",
+      args: [roomId, amountBigInt, sellerAddress as `0x${string}`],
+    });
   }, [isApproveSuccess]);
 
   const hasEnoughAllowance = (allowance ?? 0n) >= amountBigInt && amountBigInt > 0n;

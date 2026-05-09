@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lock, Check, Copy, Wallet, ShieldCheck, ArrowRight, Send, Calendar, Bell, ChevronDown, Activity, Zap, Fingerprint, FileText, CheckCircle2, User } from "lucide-react";
-import { useAccount, useDisconnect, usePublicClient, useWalletClient } from "wagmi";
+import { useAccount, useDisconnect, usePublicClient, useWalletClient, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { useModal } from "connectkit";
 import NavBar from "@/components/NavBar";
 import FHEBadge from "@/components/FHEBadge";
@@ -10,7 +10,8 @@ import EncryptionVisualizer from "@/components/EncryptionVisualizer";
 import { NEGOTIATION_TYPES, saveRoom, getRoom, type NegotiationType, type PriceUnit } from "@/lib/concord";
 import { encryptPrice, initFHE, type FHEStatus, type EncryptProgress } from "@/lib/fhe";
 // On-chain invites — no external messaging service needed
-import { BLIND_NEGOTIATION_ABI, BLIND_NEGOTIATION_ADDRESS, generateRoomIdBytes32, roomIdToCode, getExplorerTxUrl } from "@/lib/contracts";
+import { BLIND_NEGOTIATION_ABI, BLIND_NEGOTIATION_ADDRESS, CONFIDENTIAL_ESCROW_ADDRESS, CONFIDENTIAL_ESCROW_ABI, USDC_ADDRESS, USDC_ABI, generateRoomIdBytes32, roomIdToCode, getExplorerTxUrl, EscrowStatus } from "@/lib/contracts";
+import { parseUnits, formatUnits } from "viem";
 
 // Display code is now derived from roomIdHex via roomIdToCode()
 
@@ -67,10 +68,10 @@ export default function CreateRoom() {
   // Notification — counterparty wallet address for on-chain encrypted invite
   const [notifyXmtpAddr, setNotifyXmtpAddr] = useState("");
 
-  const meta = NEGOTIATION_TYPES[type];
-  const parsedPrice = parseFloat(price);
-  const isValid = !isNaN(parsedPrice) && parsedPrice > 0;
-  const roomCode = roomId ? roomIdToCode(roomId as `0x${string}`) : "";
+  // ── Inline Escrow state ───────────────────────────────────────
+  const [escrowSellerAddr, setEscrowSellerAddr] = useState("");
+  const [escrowStep, setEscrowStep] = useState<"idle" | "approving" | "depositing" | "done">("idle");
+  const [escrowError, setEscrowError] = useState("");
 
   const toggleTerm = (t: string) => {
     setSelectedTerms(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
@@ -102,6 +103,101 @@ export default function CreateRoom() {
     if (savedRoom.txHash)        setTxHash(savedRoom.txHash);
     setEncStatus("done");
   }, []);
+
+  // Derived from type/price state
+  const meta = NEGOTIATION_TYPES[type];
+  const parsedPrice = parseFloat(price);
+  const isValid = !isNaN(parsedPrice) && parsedPrice > 0;
+  const roomCode = roomId ? roomIdToCode(roomId as `0x${string}`) : "";
+
+  // Inline escrow helpers
+  function priceToRawUSDC(value: number, unit: string): bigint {
+    let usd = value;
+    if (unit === "M") usd = value * 1_000_000;
+    if (unit === "K") usd = value * 1_000;
+    if (unit === "B") usd = value * 1_000_000_000;
+    return BigInt(Math.round(usd * 1_000_000));
+  }
+  function fmtPrice(value: number, unit: string): string {
+    if (!value) return "—";
+    if (unit === "M") return `$${value}M`;
+    if (unit === "K") return `$${value}K`;
+    if (unit === "B") return `$${value}B`;
+    return `$${value.toLocaleString()} USD`;
+  }
+  const escrowAmountBigInt = parsedPrice > 0 ? priceToRawUSDC(parsedPrice, priceUnit) : 0n;
+
+  // ── Inline Escrow wagmi hooks ──────────────────────────────────
+  // Read: USDC allowance
+  const { data: escrowAllowance, refetch: refetchEscrowAllowance } = useReadContract({
+    address: USDC_ADDRESS,
+    abi: USDC_ABI,
+    functionName: "allowance",
+    args: walletAddr ? [walletAddr as `0x${string}`, CONFIDENTIAL_ESCROW_ADDRESS] : undefined,
+    query: { enabled: !!walletAddr && encStatus === "done", refetchInterval: 4000 },
+  });
+  const escrowHasAllowance = (escrowAllowance ?? 0n) >= escrowAmountBigInt && escrowAmountBigInt > 0n;
+
+  // Write: Approve USDC (for inline escrow)
+  const { writeContract: escrowApproveUsdc, data: escrowApproveTxHash, isPending: isEscrowApproving } = useWriteContract();
+  const { isLoading: isEscrowApproveLoading, isSuccess: isEscrowApproveSuccess } = useWaitForTransactionReceipt({
+    hash: escrowApproveTxHash,
+    query: { enabled: !!escrowApproveTxHash }, // guard: don't fire when hash is undefined
+  });
+
+  // Write: Deposit Escrow (for inline escrow)
+  const { writeContract: escrowDeposit, data: escrowDepositTxHash, isPending: isEscrowDepositing } = useWriteContract();
+  const { isLoading: isEscrowDepositLoading, isSuccess: isEscrowDepositSuccess } = useWaitForTransactionReceipt({
+    hash: escrowDepositTxHash,
+    query: { enabled: !!escrowDepositTxHash }, // guard
+  });
+
+  // After escrow approval — call deposit directly (no stale closure)
+  React.useEffect(() => {
+    if (!isEscrowApproveSuccess || !escrowSellerAddr || escrowAmountBigInt === 0n || !roomId) return;
+    refetchEscrowAllowance();
+    setEscrowStep("depositing");
+    escrowDeposit({
+      address: CONFIDENTIAL_ESCROW_ADDRESS,
+      abi: CONFIDENTIAL_ESCROW_ABI,
+      functionName: "depositEscrow",
+      args: [roomId as `0x${string}`, escrowAmountBigInt, escrowSellerAddr as `0x${string}`],
+    });
+  }, [isEscrowApproveSuccess]);
+
+  // After escrow deposit confirmed
+  React.useEffect(() => {
+    if (isEscrowDepositSuccess) setEscrowStep("done");
+  }, [isEscrowDepositSuccess]);
+
+  const isEscrowProcessing = isEscrowApproving || isEscrowApproveLoading || isEscrowDepositing || isEscrowDepositLoading;
+
+  const handleInlineEscrowApprove = () => {
+    if (!escrowSellerAddr.startsWith("0x") || escrowSellerAddr.length !== 42) {
+      setEscrowError("Enter a valid seller wallet address (0x…)");
+      return;
+    }
+    if (escrowAmountBigInt === 0n) { setEscrowError("Price not set"); return; }
+    setEscrowError("");
+    setEscrowStep("approving");
+    escrowApproveUsdc({
+      address: USDC_ADDRESS,
+      abi: USDC_ABI,
+      functionName: "approve",
+      args: [CONFIDENTIAL_ESCROW_ADDRESS, escrowAmountBigInt],
+    });
+  };
+
+  const handleInlineEscrowDeposit = () => {
+    if (escrowAmountBigInt === 0n || !roomId) return;
+    setEscrowStep("depositing");
+    escrowDeposit({
+      address: CONFIDENTIAL_ESCROW_ADDRESS,
+      abi: CONFIDENTIAL_ESCROW_ABI,
+      functionName: "depositEscrow",
+      args: [roomId as `0x${string}`, escrowAmountBigInt, escrowSellerAddr as `0x${string}`],
+    });
+  };
 
   // ── Eagerly connect FHE client when wallet connects ─────────────
   // connect() is lightweight (~100ms) — just registers chain + wallet.
@@ -269,7 +365,10 @@ export default function CreateRoom() {
     setDeadline("");
     setDisplayName("");
     setNotifyXmtpAddr("");
-    localStorage.removeItem("concord_last_room"); // Clear so DepositPage skip goes to blank form
+    setEscrowSellerAddr("");
+    setEscrowStep("idle");
+    setEscrowError("");
+    localStorage.removeItem("concord_last_room");
   };
 
   return (
@@ -866,24 +965,102 @@ export default function CreateRoom() {
                   <div style={{ height: 1, background: "hsl(var(--muted-foreground))", margin: "20px 0" }} />
 
 
-                  {/* Wave 4: Escrow toggle */}
+                  {/* Wave 4: Inline Escrow — no separate page */}
                   <div style={{ padding: "14px", borderRadius: 12, background: "rgba(10,132,255,0.04)", border: "1px solid rgba(10,132,255,0.14)", marginBottom: 16 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <Lock style={{ width: 13, height: 13, color: "#0a84ff" }} />
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--foreground))" }}>Confidential Escrow</span>
-                        <span style={{ fontSize: 9, fontWeight: 800, padding: "1px 6px", borderRadius: 4, background: "rgba(10,132,255,0.12)", color: "#0a84ff", border: "1px solid rgba(10,132,255,0.25)", letterSpacing: "0.05em" }}>WAVE 4</span>
-                      </div>
+                    {/* Header */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      <Lock style={{ width: 13, height: 13, color: escrowStep === "done" ? "#30d158" : "#0a84ff" }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--foreground))" }}>Confidential Escrow</span>
+                      <span style={{ fontSize: 9, fontWeight: 800, padding: "1px 6px", borderRadius: 4, background: "rgba(10,132,255,0.12)", color: "#0a84ff", border: "1px solid rgba(10,132,255,0.25)", letterSpacing: "0.05em" }}>WAVE 4</span>
+                      {escrowStep === "done" && (
+                        <span style={{ fontSize: 9, fontWeight: 800, padding: "1px 6px", borderRadius: 4, background: "rgba(48,209,88,0.12)", color: "#30d158", border: "1px solid rgba(48,209,88,0.25)", marginLeft: "auto" }}>✓ LOCKED</span>
+                      )}
                     </div>
-                    <p style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", lineHeight: 1.5, marginBottom: 10 }}>
-                      Lock funds on-chain before the deal. On a match, payment is sent automatically — no bank, no broker.
-                    </p>
-                    <button
-                      onClick={() => navigate(`/deposit/${roomId}`)}
-                      style={{ width: "100%", padding: "9px", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 10, background: "rgba(10,132,255,0.1)", border: "1px solid rgba(10,132,255,0.22)", color: "#0a84ff", cursor: "pointer" }}
-                    >
-                      <Lock style={{ width: 12, height: 12 }} /> Set Up Escrow <ArrowRight style={{ width: 12, height: 12 }} />
-                    </button>
+
+                    {escrowStep === "done" ? (
+                      <p style={{ fontSize: 12, color: "#30d158", fontWeight: 500 }}>
+                        Escrow locked! Funds secured on-chain. Settlement is now automatic.
+                      </p>
+                    ) : (
+                      <>
+                        {/* Seller address input */}
+                        <div style={{ marginBottom: 8 }}>
+                          <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
+                            Seller Wallet Address
+                          </label>
+                          <input
+                            type="text"
+                            value={escrowSellerAddr}
+                            onChange={e => { setEscrowSellerAddr(e.target.value); setEscrowError(""); }}
+                            placeholder="0x…"
+                            disabled={isEscrowProcessing}
+                            style={{
+                              width: "100%", background: "hsl(var(--input))", border: "1px solid hsl(var(--border))",
+                              borderRadius: 9, padding: "9px 12px", fontSize: 12, fontFamily: "monospace",
+                              color: "hsl(var(--foreground))", boxSizing: "border-box", outline: "none",
+                              opacity: isEscrowProcessing ? 0.5 : 1,
+                            }}
+                          />
+                        </div>
+
+                        {/* Locked amount display */}
+                        <div style={{ marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                            Deposit Amount
+                          </span>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: "#0a84ff" }}>
+                            {fmtPrice(parsedPrice, priceUnit)} USDC
+                          </span>
+                        </div>
+
+                        {/* Error */}
+                        {escrowError && (
+                          <p style={{ fontSize: 11, color: "#ff453a", marginBottom: 8 }}>{escrowError}</p>
+                        )}
+
+                        {/* Processing indicator */}
+                        {isEscrowProcessing && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, fontSize: 11, color: "hsl(var(--muted-foreground))" }}>
+                            <div style={{ width: 12, height: 12, border: "2px solid rgba(10,132,255,0.3)", borderTop: "2px solid #0a84ff", borderRadius: "50%" }} className="animate-spin" />
+                            {escrowStep === "approving" ? "Approving USDC spend — check your wallet…" : "Locking escrow on-chain…"}
+                          </div>
+                        )}
+
+                        {/* CTA: Approve or Deposit */}
+                        {!escrowHasAllowance ? (
+                          <button
+                            onClick={handleInlineEscrowApprove}
+                            disabled={isEscrowProcessing || escrowAmountBigInt === 0n}
+                            style={{
+                              width: "100%", padding: "9px", fontSize: 12, fontWeight: 600,
+                              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                              borderRadius: 10, background: "rgba(10,132,255,0.1)", border: "1px solid rgba(10,132,255,0.22)",
+                              color: "#0a84ff", cursor: isEscrowProcessing ? "not-allowed" : "pointer",
+                              opacity: isEscrowProcessing ? 0.6 : 1,
+                            }}
+                          >
+                            <ShieldCheck style={{ width: 12, height: 12 }} />
+                            {escrowStep === "approving" ? "Approving…" : "Approve USDC"}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handleInlineEscrowDeposit}
+                            disabled={isEscrowProcessing}
+                            style={{
+                              width: "100%", padding: "9px", fontSize: 12, fontWeight: 600,
+                              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                              borderRadius: 10, background: "linear-gradient(135deg, rgba(10,132,255,0.15), rgba(48,209,88,0.1))",
+                              border: "1px solid rgba(48,209,88,0.3)", color: "#30d158",
+                              cursor: isEscrowProcessing ? "not-allowed" : "pointer",
+                              opacity: isEscrowProcessing ? 0.6 : 1,
+                            }}
+                          >
+                            <Lock style={{ width: 12, height: 12 }} />
+                            {escrowStep === "depositing" ? "Locking…" : `Lock ${fmtPrice(parsedPrice, priceUnit)} Escrow`}
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
 
                   {/* Actions */}
