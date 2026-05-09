@@ -808,6 +808,27 @@ export default function CreateRoom() {
 
                   <div style={{ height: 1, background: "hsl(var(--muted-foreground))", margin: "20px 0" }} />
 
+
+                  {/* Wave 4: Escrow toggle */}
+                  <div style={{ padding: "14px", borderRadius: 12, background: "rgba(10,132,255,0.04)", border: "1px solid rgba(10,132,255,0.14)", marginBottom: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <Lock style={{ width: 13, height: 13, color: "#0a84ff" }} />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--foreground))" }}>Confidential Escrow</span>
+                        <span style={{ fontSize: 9, fontWeight: 800, padding: "1px 6px", borderRadius: 4, background: "rgba(10,132,255,0.12)", color: "#0a84ff", border: "1px solid rgba(10,132,255,0.25)", letterSpacing: "0.05em" }}>WAVE 4</span>
+                      </div>
+                    </div>
+                    <p style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", lineHeight: 1.5, marginBottom: 10 }}>
+                      Lock funds on-chain before the deal. On a match, payment is sent automatically — no bank, no broker.
+                    </p>
+                    <button
+                      onClick={() => navigate(`/deposit/${roomId}`)}
+                      style={{ width: "100%", padding: "9px", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 10, background: "rgba(10,132,255,0.1)", border: "1px solid rgba(10,132,255,0.22)", color: "#0a84ff", cursor: "pointer" }}
+                    >
+                      <Lock style={{ width: 12, height: 12 }} /> Set Up Escrow <ArrowRight style={{ width: 12, height: 12 }} />
+                    </button>
+                  </div>
+
                   {/* Actions */}
                   <button onClick={() => navigate(`/room/${roomId}`)} className="btn-apple" style={{ width: "100%", padding: "13px", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
                     Open Room <ArrowRight style={{ width: 15, height: 15 }} />
@@ -815,6 +836,7 @@ export default function CreateRoom() {
                   <button onClick={handleReset} className="btn-ghost" style={{ width: "100%", padding: "12px", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     New Negotiation
                   </button>
+
                 </div>
 
               </div>

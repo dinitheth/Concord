@@ -12,6 +12,7 @@ import RoomPage from "@/pages/RoomPage";
 import ResultPage from "@/pages/ResultPage";
 import ContractPage from "@/pages/ContractPage";
 import InboxPage from "@/pages/InboxPage";
+import DepositPage from "@/pages/DepositPage";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/result/:id" component={ResultPage} />
       <Route path="/contract" component={ContractPage} />
       <Route path="/inbox" component={InboxPage} />
+      <Route path="/deposit/:id" component={DepositPage} />
       <Route component={NotFound} />
     </Switch>
   );

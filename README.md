@@ -217,7 +217,8 @@ This property is enforced cryptographically — not by policy or trust.
 | `/join` | Counterparty flow — enter room code |
 | `/inbox` | On-chain inbox — received and sent invites |
 | `/room/:id` | Negotiation room — price submission and FHE computation |
-| `/result/:id` | Result page — deal outcome and settlement |
+| `/result/:id` | Result page — deal outcome, escrow settlement |
+| `/deposit/:id` | Wave 4 — lock USDC escrow before negotiation |
 | `/negotiate` | Interactive demo — protocol demonstration |
 
 ---
@@ -248,12 +249,45 @@ The application runs at `http://localhost:5173`.
 
 ---
 
+## Wave 4: Confidential Escrow & Auto-Settlement
+
+Wave 4 adds the financial execution layer to Concord. Instead of stopping at price discovery, the protocol now handles end-to-end trustless settlement using on-chain USDC escrow.
+
+### Deployed Contracts (Base Sepolia)
+
+| Contract | Address |
+|---|---|
+| `BlindNegotiation` | [`0x692F55eBca2fd5E7826e9bc97450Ad7f06A6a8C3`](https://sepolia.basescan.org/address/0x692F55eBca2fd5E7826e9bc97450Ad7f06A6a8C3) |
+| `ConfidentialEscrow` | [`0xa1682178715f50b794107e03494DF044B53631C7`](https://sepolia.basescan.org/address/0xa1682178715f50b794107e03494DF044B53631C7) |
+| `USDC` (Base Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+
+### Wave 4 Settlement Flow
+
+```
+1. Buyer deposits max capital (USDC) into ConfidentialEscrow before negotiation
+2. BlindNegotiation runs FHE comparison as normal (unchanged)
+3. Either party calls publishResult() on BlindNegotiation
+4. Either party calls settleEscrow() on ConfidentialEscrow
+5a. MATCH:    agreed midpoint → seller | remainder → buyer  (auto)
+5b. NO MATCH: full deposit → buyer                          (auto)
+```
+
+### Key Properties
+
+- **Trustless:** ConfidentialEscrow reads the result directly from BlindNegotiation — no manual input
+- **Non-custodial:** Funds can only move to seller (on match) or back to buyer (on no-match or emergency)
+- **Emergency refund:** Buyer can reclaim funds 48 hours after deposit if deal goes stale
+- **Separation of concerns:** FHE logic stays in BlindNegotiation; money logic stays in ConfidentialEscrow
+
+---
+
 ## Security Properties
 
 - **Input Privacy:** Prices encrypted on-device before any network transmission
 - **Computation Integrity:** All arithmetic runs inside Fhenix CoFHE — no trusted intermediary
 - **Zero-Knowledge No-Deal:** When no overlap exists, neither party learns any bound
 - **Partial Revelation on Deal:** Only the midpoint is revealed; individual prices remain encrypted
+- **Trustless Settlement:** ConfidentialEscrow enforces payment based on cryptographic proof, not human trust
 
 ---
 
