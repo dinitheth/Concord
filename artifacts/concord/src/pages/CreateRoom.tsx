@@ -49,7 +49,8 @@ export default function CreateRoom() {
 
   // Step 2 invite
   const [recipientInput, setRecipientInput] = useState("");
-  const [xmtpState, setXmtpState] = useState<"idle" | "sending" | "sent">("idle");
+  const [xmtpState, setXmtpState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [xmtpError, setXmtpError] = useState("");
   const [codeCopied, setCodeCopied] = useState(false);
 
   // Deal context
@@ -224,29 +225,49 @@ export default function CreateRoom() {
   };
 
   const sendInviteOnChain = async () => {
-    if (!recipientInput.trim() || xmtpState !== "idle") return;
-    if (!recipientInput.trim().startsWith("0x") || recipientInput.trim().length !== 42) {
-      alert("Please enter a valid wallet address (0x...)");
+    if (!recipientInput.trim() || xmtpState === "sending") return;
+    const recipient = recipientInput.trim();
+    if (!recipient.startsWith("0x") || recipient.length !== 42) {
+      setXmtpError("Enter a valid wallet address (0x…, 42 chars)");
+      return;
+    }
+    if (!roomId || !roomId.startsWith("0x")) {
+      setXmtpError("Room not created yet — please wait");
+      return;
+    }
+    if (!walletClient || !publicClient) {
+      setXmtpError("Wallet not ready");
       return;
     }
     setXmtpState("sending");
+    setXmtpError("");
     try {
-      // roomId is already the roomIdHex (bytes32) — use it directly
-      if (!roomId || !roomId.startsWith("0x")) throw new Error("Room ID not available");
-      if (!walletClient) throw new Error("Wallet not connected");
-
-      await walletClient.writeContract({
+      // Send invite tx
+      const hash = await walletClient.writeContract({
         address: BLIND_NEGOTIATION_ADDRESS,
         abi: BLIND_NEGOTIATION_ABI,
         functionName: "sendInvite",
-        args: [roomId as `0x${string}`, recipientInput.trim() as `0x${string}`],
+        args: [roomId as `0x${string}`, recipient as `0x${string}`],
         chain: walletClient.chain,
         account: walletClient.account,
       });
+      // Wait for confirmation so we know the room existed on-chain
+      await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
       setXmtpState("sent");
-    } catch (err) {
+    } catch (err: any) {
       console.error("[SendInvite] Error:", err);
-      setXmtpState("idle");
+      // Parse revert reason for user-friendly message
+      const msg: string = err?.shortMessage ?? err?.message ?? "Transaction failed";
+      if (msg.includes("Room does not exist")) {
+        setXmtpError("Room not confirmed on-chain yet. Wait a few seconds and try again.");
+      } else if (msg.includes("Only room creator")) {
+        setXmtpError("Only the room creator can send invites.");
+      } else if (msg.includes("Cannot invite yourself")) {
+        setXmtpError("You cannot invite your own wallet address.");
+      } else {
+        setXmtpError(msg.length > 80 ? msg.slice(0, 80) + "…" : msg);
+      }
+      setXmtpState("error");
     }
   };
 
@@ -265,6 +286,7 @@ export default function CreateRoom() {
     setRoomId("");
     setRecipientInput("");
     setXmtpState("idle");
+    setXmtpError("");
     setCodeCopied(false);
     setDealName("");
     setDealDesc("");
@@ -673,19 +695,19 @@ export default function CreateRoom() {
                         <div style={{
                           position: "absolute", inset: -4,
                           background: "linear-gradient(90deg, #22d3ee, #3b82f6)",
-                          borderRadius: 16, filter: "blur(12px)", opacity: (!isValid || !walletConnected || !publicClient || !walletClient) ? 0 : 0.2,
+                          borderRadius: 16, filter: "blur(12px)", opacity: (!isValid || !walletConnected || !publicClient || !walletClient || !notifyXmtpAddr.trim()) ? 0 : 0.2,
                           transition: "opacity 0.5s", pointerEvents: "none",
                         }} />
                         <button
                           onClick={() => setShowConfirm(true)}
-                          disabled={!isValid || !walletConnected || !publicClient || !walletClient || encStatus === "encrypting"}
+                          disabled={!isValid || !walletConnected || !publicClient || !walletClient || !notifyXmtpAddr.trim() || encStatus === "encrypting"}
                           style={{
                             position: "relative", width: "100%", padding: "16px 24px",
                             borderRadius: 14, fontSize: 15, fontWeight: 700,
-                            background: (!isValid || !walletConnected || !publicClient || !walletClient) ? "hsl(var(--secondary))" : "hsl(var(--primary))",
-                            color: (!isValid || !walletConnected || !publicClient || !walletClient) ? "hsl(var(--muted-foreground))" : "hsl(var(--primary-foreground))", border: "1px solid hsl(var(--border))",
-                            cursor: (!isValid || !walletConnected || !publicClient || !walletClient || encStatus === "encrypting") ? "not-allowed" : "pointer",
-                            opacity: (!isValid || !walletConnected || !publicClient || !walletClient) ? 0.7 : 1,
+                            background: (!isValid || !walletConnected || !publicClient || !walletClient || !notifyXmtpAddr.trim()) ? "hsl(var(--secondary))" : "hsl(var(--primary))",
+                            color: (!isValid || !walletConnected || !publicClient || !walletClient || !notifyXmtpAddr.trim()) ? "hsl(var(--muted-foreground))" : "hsl(var(--primary-foreground))", border: "1px solid hsl(var(--border))",
+                            cursor: (!isValid || !walletConnected || !publicClient || !walletClient || !notifyXmtpAddr.trim() || encStatus === "encrypting") ? "not-allowed" : "pointer",
+                            opacity: (!isValid || !walletConnected || !publicClient || !walletClient || !notifyXmtpAddr.trim()) ? 0.6 : 1,
                             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                             transition: "all 0.3s",
                           }}
@@ -696,6 +718,8 @@ export default function CreateRoom() {
                             <><Wallet style={{ width: 15, height: 15 }} />Connect Wallet to Continue</>
                           ) : (!publicClient || !walletClient) ? (
                             <><div style={{ width: 15, height: 15, border: "2px solid hsl(var(--muted-foreground))", borderTop: "2px solid white", borderRadius: "50%" }} className="animate-spin" />Initializing Wallet…</>
+                          ) : !notifyXmtpAddr.trim() ? (
+                            <><Bell style={{ width: 15, height: 15 }} />Enter Counterparty Address to Continue</>
                           ) : (
                             <><Lock style={{ width: 15, height: 15 }} />Review and Encrypt Room</>
                           )}
@@ -829,12 +853,18 @@ export default function CreateRoom() {
                       <input
                         type="text"
                         value={recipientInput}
-                        onChange={e => setRecipientInput(e.target.value)}
+                        onChange={e => { setRecipientInput(e.target.value); if (xmtpState === "error") { setXmtpState("idle"); setXmtpError(""); } }}
                         readOnly={!!notifyXmtpAddr.trim()}
                         placeholder="0x… or ENS name"
                         className="apple-input"
-                        style={{ width: "100%", padding: "11px 14px", fontSize: 13, fontFamily: "monospace", marginBottom: 10, boxSizing: "border-box", opacity: notifyXmtpAddr.trim() ? 0.55 : 1, cursor: notifyXmtpAddr.trim() ? "not-allowed" : "text" }}
+                        style={{ width: "100%", padding: "11px 14px", fontSize: 13, fontFamily: "monospace", marginBottom: 6, boxSizing: "border-box", opacity: notifyXmtpAddr.trim() ? 0.55 : 1, cursor: notifyXmtpAddr.trim() ? "not-allowed" : "text" }}
                       />
+                      {/* Error feedback */}
+                      {xmtpState === "error" && xmtpError && (
+                        <div style={{ fontSize: 11, color: "#ff453a", marginBottom: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(255,69,58,0.08)", border: "1px solid rgba(255,69,58,0.2)" }}>
+                          {xmtpError}
+                        </div>
+                      )}
                       <button
                         onClick={sendInviteOnChain}
                         disabled={!recipientInput.trim() || xmtpState === "sending"}
@@ -842,7 +872,7 @@ export default function CreateRoom() {
                         style={{ width: "100%", padding: "12px", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: !recipientInput.trim() ? 0.35 : 1, cursor: !recipientInput.trim() || xmtpState === "sending" ? "not-allowed" : "pointer" }}
                       >
                         {xmtpState === "sending" ? (
-                          <><div style={{ width: 14, height: 14, border: "2px solid hsl(var(--muted-foreground))", borderTop: "2px solid white", borderRadius: "50%" }} className="animate-spin" />Sending…</>
+                          <><div style={{ width: 14, height: 14, border: "2px solid hsl(var(--muted-foreground))", borderTop: "2px solid white", borderRadius: "50%" }} className="animate-spin" />Sending — check your wallet…</>
                         ) : (
                           <><Send style={{ width: 13, height: 13 }} />Send On-Chain Invite</>
                         )}
