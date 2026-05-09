@@ -25,19 +25,36 @@ export default function DepositPage() {
   const [step, setStep] = useState<"review" | "approving" | "depositing" | "done">("review");
   const [error, setError] = useState("");
 
-  // Load room — pre-fill seller address and lock the deposit amount from saved floor price
+  // Load room — pre-fill from saved floor price + unit
   const room = getRoom(roomId);
   const floorPrice = room?.myPrice ?? 0;
-  const meta = room ? { unit: room.type === "salary" ? "K" : "M" } : { unit: "" };
+  const priceUnit = room?.myPriceUnit ?? "USD";
 
+  // Convert the raw price + unit to the actual USDC amount (6 decimals)
+  function priceToRawUSDC(value: number, unit: string): bigint {
+    let usd = value;
+    if (unit === "M")   usd = value * 1_000_000;
+    if (unit === "K")   usd = value * 1_000;
+    if (unit === "B")   usd = value * 1_000_000_000;
+    // Multiply by 10^6 for USDC decimals
+    return BigInt(Math.round(usd * 1_000_000));
+  }
+
+  function formatPriceDisplay(value: number, unit: string): string {
+    if (!value) return "—";
+    if (unit === "M")   return `$${value.toLocaleString()}M (≈ $${(value * 1_000_000).toLocaleString()})`;
+    if (unit === "K")   return `$${value.toLocaleString()}K (≈ $${(value * 1_000).toLocaleString()})`;
+    if (unit === "B")   return `$${value.toLocaleString()}B (≈ $${(value * 1_000_000_000).toLocaleString()})`;
+    return `$${value.toLocaleString()} USD`;
+  }
+
+  // Deposit amount in USDC (6 decimals)
+  const amountBigInt = floorPrice > 0 ? priceToRawUSDC(floorPrice, priceUnit) : 0n;
+
+  // Pre-fill seller address from saved room
   useEffect(() => {
     if (room?.partyA?.address) setSellerAddress(room.partyA.address);
   }, [roomId]);
-
-  // Deposit amount is the floor price converted to USDC (6 decimals)
-  // e.g. if user entered 7 (meaning $7M), we use 7 * 1_000_000 USDC units = 7000000
-  // This is the seller's floor — buyer must deposit at least this much
-  const amountBigInt = floorPrice > 0 ? parseUnits(String(floorPrice), 6) : 0n;
 
   // Read USDC balance
   const { data: usdcBalance } = useReadContract({
@@ -238,8 +255,8 @@ export default function DepositPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <DollarSign className="w-4 h-4 text-foreground/25" />
-                  <div className="flex-1 text-[22px] font-semibold text-foreground sf-display">
-                    {floorPrice > 0 ? `${floorPrice}${meta.unit} (≈ $${floorPrice}${meta.unit})` : "—"}
+                  <div className="flex-1 text-[20px] font-semibold text-foreground sf-display">
+                    {formatPriceDisplay(floorPrice, priceUnit)}
                   </div>
                   <span className="text-[12px] text-foreground/30 font-semibold">USDC</span>
                 </div>
@@ -291,7 +308,7 @@ export default function DepositPage() {
                   {step === "depositing" ? (
                     <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Locking Escrow…</>
                   ) : (
-                    <><Lock className="w-4 h-4" /> Lock Escrow ({floorPrice}{meta.unit} USDC)</>
+                  <><Lock className="w-4 h-4" /> Lock Escrow ({formatPriceDisplay(floorPrice, priceUnit)})</>
                   )}
                 </button>
               )}

@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Activity, CheckCircle2, XCircle, Clock, ArrowRight,
   ExternalLink, Lock, Wallet, ShieldCheck, ChevronRight,
-  TrendingUp, Hash, Calendar,
+  TrendingUp, Hash, Calendar, Building2, Briefcase, Home, Handshake,
 } from "lucide-react";
 import { useAccount } from "wagmi";
 import NavBar from "@/components/NavBar";
@@ -50,11 +50,19 @@ function statusLabel(room: Room): string {
   }
 }
 
-const TYPE_ICONS: Record<NegotiationType, string> = {
-  ma:         "🏢",
-  salary:     "💼",
-  realestate: "🏠",
-  custom:     "🤝",
+// ── Negotiation type icon map (Lucide icons, no emojis) ──────────
+const TYPE_ICON_MAP: Record<NegotiationType, React.ElementType> = {
+  ma:         Building2,
+  salary:     Briefcase,
+  realestate: Home,
+  custom:     Handshake,
+};
+
+const TYPE_COLOR_MAP: Record<NegotiationType, string> = {
+  ma:         "#0a84ff",
+  salary:     "#30d158",
+  realestate: "#ff9f0a",
+  custom:     "#bf5af2",
 };
 
 // ── Component ────────────────────────────────────────────────────
@@ -190,18 +198,28 @@ export default function ProfilePage() {
                       className="p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors cursor-pointer group"
                       onClick={() => navigate(room.status === "settled" ? `/result/${room.id}` : `/room/${room.id}`)}
                     >
-                      {/* Type icon */}
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-[18px]"
-                        style={{ background: "rgba(10,132,255,0.06)", border: "1px solid rgba(10,132,255,0.12)" }}>
-                        {TYPE_ICONS[room.type]}
-                      </div>
+                      {/* Type icon — Lucide, color-coded */}
+                      {(() => {
+                        const Icon = TYPE_ICON_MAP[room.type] ?? Handshake;
+                        const col  = TYPE_COLOR_MAP[room.type] ?? "#8e8e93";
+                        return (
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                            style={{ background: `${col}14`, border: `1px solid ${col}30` }}>
+                            <Icon className="w-5 h-5" style={{ color: col }} />
+                          </div>
+                        );
+                      })()}
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className="text-[14px] font-semibold text-foreground truncate">
-                            {room.label}
-                            {room.myPrice ? ` · ${room.myPrice}${meta.unit}` : ""}
+                            {room.dealName || room.label}
+                            {room.myPrice ? (
+                              <span className="font-normal text-foreground/50 ml-1">
+                                · {room.myPrice}{room.myPriceUnit ?? ""}
+                              </span>
+                            ) : null}
                           </span>
                         </div>
                         <div className="flex items-center gap-3">

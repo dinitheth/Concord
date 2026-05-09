@@ -7,7 +7,7 @@ import { useModal } from "connectkit";
 import NavBar from "@/components/NavBar";
 import FHEBadge from "@/components/FHEBadge";
 import EncryptionVisualizer from "@/components/EncryptionVisualizer";
-import { NEGOTIATION_TYPES, saveRoom, getRoom, type NegotiationType } from "@/lib/concord";
+import { NEGOTIATION_TYPES, saveRoom, getRoom, type NegotiationType, type PriceUnit } from "@/lib/concord";
 import { encryptPrice, initFHE, type FHEStatus, type EncryptProgress } from "@/lib/fhe";
 // On-chain invites — no external messaging service needed
 import { BLIND_NEGOTIATION_ABI, BLIND_NEGOTIATION_ADDRESS, generateRoomIdBytes32, roomIdToCode, getExplorerTxUrl } from "@/lib/contracts";
@@ -40,6 +40,7 @@ export default function CreateRoom() {
   // Core
   const [type, setType] = useState<NegotiationType>("ma");
   const [price, setPrice] = useState("");
+  const [priceUnit, setPriceUnit] = useState<PriceUnit>("M"); // M/K/B/USD
   const [encStatus, setEncStatus] = useState<"idle" | "encrypting" | "done">("idle");
   const [fheStatus, setFHEStatus] = useState<FHEStatus>("idle");
   const [ciphertext, setCiphertext] = useState("");
@@ -82,16 +83,23 @@ export default function CreateRoom() {
   const [encryptStep, setEncryptStep] = useState<string>("");
 
   // ── Restore floor-lock state when navigating back from DepositPage ──
-  // If there's a completed room in localStorage, restore the done view.
+  // Saves/restores ALL deal fields so the floor-lock card is fully populated.
   React.useEffect(() => {
     const lastRoomId = localStorage.getItem("concord_last_room");
     if (!lastRoomId || encStatus !== "idle") return;
     const savedRoom = getRoom(lastRoomId);
     if (!savedRoom) return;
     setRoomId(lastRoomId);
-    if (savedRoom.myPrice) setPrice(String(savedRoom.myPrice));
-    if (savedRoom.type) setType(savedRoom.type as NegotiationType);
-    if (savedRoom.txHash) setTxHash(savedRoom.txHash);
+    if (savedRoom.myPrice)       setPrice(String(savedRoom.myPrice));
+    if (savedRoom.myPriceUnit)   setPriceUnit(savedRoom.myPriceUnit as PriceUnit);
+    if (savedRoom.type)          setType(savedRoom.type as NegotiationType);
+    if (savedRoom.dealName)      setDealName(savedRoom.dealName);
+    if (savedRoom.dealDesc)      setDealDesc(savedRoom.dealDesc);
+    if (savedRoom.selectedTerms) setSelectedTerms(savedRoom.selectedTerms);
+    if (savedRoom.deadlineStr)   setDeadline(savedRoom.deadlineStr);
+    if (savedRoom.displayName)   setDisplayName(savedRoom.displayName);
+    if (savedRoom.notifyAddr)    setNotifyXmtpAddr(savedRoom.notifyAddr);
+    if (savedRoom.txHash)        setTxHash(savedRoom.txHash);
     setEncStatus("done");
   }, []);
 
@@ -180,7 +188,14 @@ export default function CreateRoom() {
         type,
         label: meta.label,
         status: "pending_b",
-        myPrice: Number(price),   // Store floor price so DepositPage can pre-fill it
+        myPrice: Number(price),
+        myPriceUnit: priceUnit,
+        dealName: dealName || undefined,
+        dealDesc: dealDesc || undefined,
+        selectedTerms: selectedTerms.length > 0 ? selectedTerms : undefined,
+        deadlineStr: deadline || undefined,
+        displayName: displayName || undefined,
+        notifyAddr: notifyXmtpAddr.trim() || undefined,
         partyA: { address: walletAddr, timestamp: Date.now() },
         createdAt: Date.now(),
         deadline: Number(deadlineTs) * 1000,
@@ -241,6 +256,7 @@ export default function CreateRoom() {
   const handleReset = () => {
     setEncStatus("idle");
     setPrice("");
+    setPriceUnit("M");
     setCiphertext("");
     setFHEStatus("idle");
     setRoomId("");
@@ -552,7 +568,7 @@ export default function CreateRoom() {
                             placeholder={meta.placeholder}
                             style={{
                               width: "100%", background: "hsl(var(--input))", border: "1px solid hsl(var(--border))",
-                              borderRadius: 14, padding: "16px 80px 16px 40px", fontSize: 28, fontWeight: 300,
+                              borderRadius: 14, padding: "16px 110px 16px 40px", fontSize: 28, fontWeight: 300,
                               color: "hsl(var(--foreground))", boxSizing: "border-box", outline: "none",
                               transition: "all 0.3s",
                               boxShadow: price ? "0 0 20px rgba(34,211,238,0.08)" : "none",
@@ -560,16 +576,39 @@ export default function CreateRoom() {
                             className="apple-input"
                             onKeyDown={e => e.key === "Enter" && isValid && walletConnected && setShowConfirm(true)}
                           />
-                          {meta.unit && (
-                            <div style={{
+                          {/* Unit Selector — click to cycle M → K → B → USD → M */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const order: PriceUnit[] = ["M", "K", "B", "USD"];
+                              const idx = order.indexOf(priceUnit);
+                              setPriceUnit(order[(idx + 1) % order.length]);
+                            }}
+                            title="Click to change unit"
+                            style={{
                               position: "absolute", right: 8, display: "flex", alignItems: "center", gap: 4,
-                              background: "hsl(var(--secondary))", borderRadius: 10, padding: "6px 12px",
-                              border: "1px solid hsl(var(--border))",
-                            }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: "hsl(var(--foreground))", opacity: 0.8 }}>{meta.unit}</span>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: "hsl(var(--muted-foreground))" }}>USD</span>
-                            </div>
+                              background: "hsl(var(--secondary))", borderRadius: 10, padding: "6px 10px",
+                              border: "1px solid hsl(var(--border))", cursor: "pointer",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <span style={{ fontSize: 13, fontWeight: 800, color: "#0a84ff" }}>{priceUnit}</span>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: "hsl(var(--muted-foreground))", marginLeft: 1 }}>USD</span>
+                            <ChevronDown style={{ width: 10, height: 10, color: "hsl(var(--muted-foreground))" }} />
+                          </button>
+                        </div>
+                        {/* Unit hint */}
+                        <div style={{ marginTop: 6, fontSize: 11, color: "hsl(var(--muted-foreground))", opacity: 0.7 }}>
+                          {price && !isNaN(parseFloat(price)) && (
+                            <>
+                              {priceUnit === "M" && `= $${parseFloat(price).toLocaleString()} million USD`}
+                              {priceUnit === "K" && `= $${parseFloat(price).toLocaleString()} thousand USD`}
+                              {priceUnit === "B" && `= $${parseFloat(price).toLocaleString()} billion USD`}
+                              {priceUnit === "USD" && `= $${parseFloat(price).toLocaleString()} USD (exact)`}
+                              {" "}· tap the badge to change unit
+                            </>
                           )}
+                          {!price && "Enter your price — tap the badge to change unit (M/K/B/USD)"}
                         </div>
 
                         {/* Ciphertext preview */}

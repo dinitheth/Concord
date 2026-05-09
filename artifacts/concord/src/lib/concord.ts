@@ -2,13 +2,22 @@ export type NegotiationType = "ma" | "salary" | "realestate" | "custom";
 export type PartyRole = "A" | "B";
 export type RoomStatus = "open" | "pending_b" | "computing" | "settled" | "expired";
 
+export type PriceUnit = "M" | "K" | "B" | "USD";
+
 export interface Room {
   id: string;
-  roomIdHex: string; // bytes32 on-chain room ID
+  roomIdHex: string;          // bytes32 on-chain room ID
   type: NegotiationType;
   label: string;
   status: RoomStatus;
-  myPrice?: number;   // Party A's floor price (local only, never sent on-chain)
+  myPrice?: number;           // Party A's raw price value (local only, never sent on-chain)
+  myPriceUnit?: PriceUnit;   // The unit the user chose: M/K/B/USD
+  dealName?: string;          // Optional deal title
+  dealDesc?: string;          // Optional deal description
+  selectedTerms?: string[];   // Selected deal terms
+  deadlineStr?: string;       // ISO deadline string (for display)
+  displayName?: string;       // Party A display name (off-chain)
+  notifyAddr?: string;        // Invited counterparty address
   partyA?: {
     address: string;
     timestamp: number;
