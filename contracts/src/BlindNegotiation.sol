@@ -300,4 +300,29 @@ contract BlindNegotiation {
     function getSentInviteCount(address sender) external view returns (uint256) {
         return sentInvites[sender].length;
     }
+
+    // ── Wave 4: Escrow Integration ──────────────────────────────
+
+    /**
+     * @notice Returns the published result for the ConfidentialEscrow contract.
+     * @dev Called by ConfidentialEscrow.settleEscrow() to trustlessly read
+     *      the FHE comparison result without any manual input.
+     *      Returns (false, false, 0) if result has not been published yet.
+     *
+     * @param roomId  The room to query.
+     * @return isPublished  Whether publishResult() has been called.
+     * @return matched      Whether the FHE comparison found an overlap.
+     * @return agreedPrice  The decrypted midpoint price (0 if no match).
+     */
+    function getPublishedResult(bytes32 roomId) external view returns (
+        bool isPublished,
+        bool matched,
+        uint64 agreedPrice
+    ) {
+        return (
+            resultPublished[roomId],
+            matchResult[roomId],
+            publishedPrice[roomId]
+        );
+    }
 }
