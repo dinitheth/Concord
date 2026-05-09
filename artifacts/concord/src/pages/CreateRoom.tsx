@@ -69,7 +69,9 @@ export default function CreateRoom() {
   const [notifyXmtpAddr, setNotifyXmtpAddr] = useState("");
 
   // ── Inline Escrow state ───────────────────────────────────────
-  const [escrowSellerAddr, setEscrowSellerAddr] = useState("");
+  // NOTE: The room creator (Party A) IS the seller — they receive payment on match.
+  // The buyer (Party B) deposits capital. So the "seller" address for the escrow
+  // is simply walletAddr (the connected wallet = the room creator).
   const [escrowStep, setEscrowStep] = useState<"idle" | "approving" | "depositing" | "done">("idle");
   const [escrowError, setEscrowError] = useState("");
 
@@ -152,16 +154,17 @@ export default function CreateRoom() {
     query: { enabled: !!escrowDepositTxHash }, // guard
   });
 
-  // After escrow approval — call deposit directly (no stale closure)
+  // After escrow approval — deposit directly using walletAddr as seller (no stale closure)
   React.useEffect(() => {
-    if (!isEscrowApproveSuccess || !escrowSellerAddr || escrowAmountBigInt === 0n || !roomId) return;
+    if (!isEscrowApproveSuccess || escrowAmountBigInt === 0n || !roomId || !walletAddr) return;
     refetchEscrowAllowance();
     setEscrowStep("depositing");
     escrowDeposit({
       address: CONFIDENTIAL_ESCROW_ADDRESS,
       abi: CONFIDENTIAL_ESCROW_ABI,
       functionName: "depositEscrow",
-      args: [roomId as `0x${string}`, escrowAmountBigInt, escrowSellerAddr as `0x${string}`],
+      // seller = walletAddr: the room creator (Party A) receives payment on match
+      args: [roomId as `0x${string}`, escrowAmountBigInt, walletAddr as `0x${string}`],
     });
   }, [isEscrowApproveSuccess]);
 
@@ -173,11 +176,8 @@ export default function CreateRoom() {
   const isEscrowProcessing = isEscrowApproving || isEscrowApproveLoading || isEscrowDepositing || isEscrowDepositLoading;
 
   const handleInlineEscrowApprove = () => {
-    if (!escrowSellerAddr.startsWith("0x") || escrowSellerAddr.length !== 42) {
-      setEscrowError("Enter a valid seller wallet address (0x…)");
-      return;
-    }
-    if (escrowAmountBigInt === 0n) { setEscrowError("Price not set"); return; }
+    if (escrowAmountBigInt === 0n) { setEscrowError("Price not set — go back and set your floor price"); return; }
+    if (!walletAddr) { setEscrowError("Wallet not connected"); return; }
     setEscrowError("");
     setEscrowStep("approving");
     escrowApproveUsdc({
@@ -189,13 +189,14 @@ export default function CreateRoom() {
   };
 
   const handleInlineEscrowDeposit = () => {
-    if (escrowAmountBigInt === 0n || !roomId) return;
+    if (escrowAmountBigInt === 0n || !roomId || !walletAddr) return;
     setEscrowStep("depositing");
     escrowDeposit({
       address: CONFIDENTIAL_ESCROW_ADDRESS,
       abi: CONFIDENTIAL_ESCROW_ABI,
       functionName: "depositEscrow",
-      args: [roomId as `0x${string}`, escrowAmountBigInt, escrowSellerAddr as `0x${string}`],
+      // seller = walletAddr: the room creator (Party A) IS the seller
+      args: [roomId as `0x${string}`, escrowAmountBigInt, walletAddr as `0x${string}`],
     });
   };
 
@@ -365,7 +366,6 @@ export default function CreateRoom() {
     setDeadline("");
     setDisplayName("");
     setNotifyXmtpAddr("");
-    setEscrowSellerAddr("");
     setEscrowStep("idle");
     setEscrowError("");
     localStorage.removeItem("concord_last_room");
@@ -979,28 +979,15 @@ export default function CreateRoom() {
 
                     {escrowStep === "done" ? (
                       <p style={{ fontSize: 12, color: "#30d158", fontWeight: 500 }}>
-                        Escrow locked! Funds secured on-chain. Settlement is now automatic.
+                        Escrow locked! Your USDC is secured on-chain. Settlement is automatic on deal match.
                       </p>
                     ) : (
                       <>
-                        {/* Seller address input */}
-                        <div style={{ marginBottom: 8 }}>
-                          <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
-                            Seller Wallet Address
-                          </label>
-                          <input
-                            type="text"
-                            value={escrowSellerAddr}
-                            onChange={e => { setEscrowSellerAddr(e.target.value); setEscrowError(""); }}
-                            placeholder="0x…"
-                            disabled={isEscrowProcessing}
-                            style={{
-                              width: "100%", background: "hsl(var(--input))", border: "1px solid hsl(var(--border))",
-                              borderRadius: 9, padding: "9px 12px", fontSize: 12, fontFamily: "monospace",
-                              color: "hsl(var(--foreground))", boxSizing: "border-box", outline: "none",
-                              opacity: isEscrowProcessing ? 0.5 : 1,
-                            }}
-                          />
+                        {/* Recipient info — read-only, derived automatically */}
+                        <div style={{ marginBottom: 10, padding: "8px 10px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid hsl(var(--border))" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Payment recipient (you)</div>
+                          <div style={{ fontSize: 11, fontFamily: "monospace", color: "hsl(var(--foreground))", opacity: 0.7 }}>{walletAddr || "—"}</div>
+                          <div style={{ fontSize: 10, color: "hsl(var(--muted-foreground))", marginTop: 2 }}>If a deal is matched, the agreed amount is sent here automatically.</div>
                         </div>
 
                         {/* Locked amount display */}
@@ -1022,7 +1009,7 @@ export default function CreateRoom() {
                         {isEscrowProcessing && (
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, fontSize: 11, color: "hsl(var(--muted-foreground))" }}>
                             <div style={{ width: 12, height: 12, border: "2px solid rgba(10,132,255,0.3)", borderTop: "2px solid #0a84ff", borderRadius: "50%" }} className="animate-spin" />
-                            {escrowStep === "approving" ? "Approving USDC spend — check your wallet…" : "Locking escrow on-chain…"}
+                            {escrowStep === "approving" ? "Approving USDC — check your wallet…" : "Locking escrow on-chain…"}
                           </div>
                         )}
 
