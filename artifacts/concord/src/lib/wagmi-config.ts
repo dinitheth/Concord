@@ -8,11 +8,16 @@ import { getDefaultConfig } from "connectkit";
 // Use multiple CORS-friendly RPC endpoints with fallback
 
 type AnyWindow = Window & {
-  ethereum?: Record<string, unknown> & { isMetaMask?: boolean; providers?: (Record<string, unknown> & { isMetaMask?: boolean })[] };
-  okxwallet?: Record<string, unknown>;
+  ethereum?: InjectedProvider;
+  okxwallet?: InjectedProvider;
 };
 
-function getOtherProvider() {
+type InjectedProvider = Record<string, unknown> & {
+  isMetaMask?: boolean;
+  providers?: InjectedProvider[];
+};
+
+function getOtherProvider(): InjectedProvider | undefined {
   if (typeof window === "undefined") return undefined;
   const w = window as AnyWindow;
   // Prefer OKX wallet if available
@@ -21,8 +26,8 @@ function getOtherProvider() {
   if (!eth) return undefined;
   // In multi-wallet browsers, pick the first non-MetaMask provider
   if (Array.isArray(eth.providers)) {
-    const other = eth.providers.find((p) => !p.isMetaMask);
-    if (other) return other as never;
+    const other = eth.providers.find((p: InjectedProvider) => !p.isMetaMask);
+    if (other) return other;
   }
   // Last resort: any injected provider
   return eth as never;
@@ -61,11 +66,12 @@ export const wagmiConfig = createConfig(
         target: {
           id: "other-wallets",
           name: "Other Wallets",
-          provider: getOtherProvider(),
+          provider: () => getOtherProvider() as never,
           icon: OTHER_WALLETS_ICON,
         },
       }),
     ],
+    walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || "concord-local-dev",
     appName: "Concord",
     appDescription: "Blind negotiation protocol — two parties discover if they have a deal without revealing reservation prices.",
     appUrl: typeof window !== "undefined" ? window.location.origin : "https://concord.app",

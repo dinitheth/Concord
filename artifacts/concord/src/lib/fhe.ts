@@ -49,6 +49,8 @@ const config = createCofheConfig({
 
 let client: ReturnType<typeof createCofheClient> | null = null;
 let isConnected = false;
+let connectedAccount: string | undefined;
+let connectedChainId: number | undefined;
 
 /**
  * Initialize the CoFHE client. connect() is fast (~100ms).
@@ -61,9 +63,15 @@ export async function initFHE(
   if (!client) {
     client = createCofheClient(config);
   }
-  if (!isConnected) {
+
+  const nextAccount = walletClient.account?.address?.toLowerCase();
+  const nextChainId = walletClient.chain?.id ?? publicClient.chain?.id;
+
+  if (!isConnected || connectedAccount !== nextAccount || connectedChainId !== nextChainId) {
     await client.connect(publicClient, walletClient);
     isConnected = true;
+    connectedAccount = nextAccount;
+    connectedChainId = nextChainId;
     console.log("[FHE] CoFHE client connected to Base Sepolia");
   }
 }
@@ -157,9 +165,13 @@ export async function decryptForTx(
     throw new Error("[FHE] Client not initialized. Call initFHE() first.");
   }
 
+  // BlindNegotiation grants result handles with FHE.allow(handle, party),
+  // not FHE.allowPublic(handle), so CoFHE requires a signed self permit.
+  const permit = await client.permits.getOrCreateSelfPermit();
+
   const result = await client
     .decryptForTx(ctHash)
-    .withoutPermit()
+    .withPermit(permit)
     .execute();
 
   return {

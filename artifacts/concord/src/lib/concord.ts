@@ -30,8 +30,9 @@ export interface Room {
     matched: boolean;
     agreedPrice?: number;
     timestamp: number;
-    txHash: string;
+    txHash?: string;
     escrowId?: string;
+    isEncrypted?: boolean;
   };
   createdAt: number;
   deadline: number;
@@ -179,7 +180,7 @@ export function shortAddress(addr: string): string {
 
 // ── Contract Constants ──────────────────────────────────────────
 
-export const CONCORD_CONTRACT_ADDRESS = "0xd7FA8ad77cfAa55674af496088f8D3723F9ff402";
+export const CONCORD_CONTRACT_ADDRESS = "0xEB81D05a54068A662aD7aC62CF1Df91cD5e9DdE6";
 export const CONCORD_NETWORK = "Base Sepolia";
 export const CONCORD_CHAIN_ID = 84532;
 export const CONCORD_EXPLORER = "https://sepolia.basescan.org";

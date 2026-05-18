@@ -10,7 +10,7 @@ import {
   escrowConfig, formatUsdc, getEscrowExplorerUrl,
   EscrowStatus, type OnChainEscrow,
 } from "@/lib/contracts";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient } from "wagmi";
 import { decryptForTx, initFHE } from "@/lib/fhe";
 
 export default function ResultPage() {
@@ -21,11 +21,34 @@ export default function ResultPage() {
   const [revealed, setRevealed] = useState(false);
   const [loading, setLoading] = useState(true);
   const { address } = useAccount();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+  const [decrypting, setDecrypting] = useState(false);
+  const [decryptError, setDecryptError] = useState("");
+  const [accessDenied, setAccessDenied] = useState(false);
 
   // ── Escrow write ────────────────────────────────────────────
   const { writeContract: settleEscrow, data: settleTxHash, isPending: isSettling } = useWriteContract();
   const { isLoading: isSettleLoading, isSuccess: isSettleSuccess } = useWaitForTransactionReceipt({ hash: settleTxHash });
+
+  // ── Decrypt & Publish write ─────────────────────────────────
+  const { writeContract: publishResult, data: publishTxHash, isPending: isPublishing } = useWriteContract();
+  const { isLoading: isPublishLoading, isSuccess: isPublishSuccess } = useWaitForTransactionReceipt({ hash: publishTxHash });
+
+  useEffect(() => {
+    if (isPublishSuccess) {
+      // It published! Reload page to see the new state
+      window.location.reload();
+    }
+  }, [isPublishSuccess]);
+
+  useEffect(() => {
+    setAccessDenied(false);
+    setDecryptError("");
+  }, [address, id]);
+
   const [settleError, setSettleError] = useState("");
+
 
   // Read on-chain room info — includes status, published result data
   const { data: onChainInfo, isLoading: isOnChainLoading } = useReadContract({
@@ -109,7 +132,7 @@ export default function ResultPage() {
         matched: onChainMatched,
         agreedPrice: onChainMatched && Number(onChainPrice) > 0 ? Number(onChainPrice) : undefined,
         timestamp: Date.now(),
-        txHash: localRoom?.result?.txHash,
+        txHash: localRoom?.result?.txHash ?? localRoom?.txHash,
       };
     } else if (status >= 3) {
       // Settled (FHE comparison ran) but not published
@@ -156,53 +179,54 @@ export default function ResultPage() {
   const isSettled = room.status === "settled";
   const hasResult = !!room.result;
   const isEncrypted = (room.result as any)?.isEncrypted;
+  const isViewerParty = !!address && (
+    room.partyA?.address?.toLowerCase() === address.toLowerCase() ||
+    room.partyB?.address?.toLowerCase() === address.toLowerCase()
+  );
+  const isDealNotFoundForViewer = !!isEncrypted && !!address && (!isViewerParty || accessDenied);
   const matched = room.result?.matched ?? false;
   const agreedPrice = room.result?.agreedPrice;
   const txHash = room.result?.txHash || room.txHash;
   const displayPrice = agreedPrice ? `$${agreedPrice}${meta.unit}` : null;
 
-  // ── Decrypt & Publish ───────────────────────────────────────
-  const { writeContract: publishResult, data: publishTxHash, isPending: isPublishing } = useWriteContract();
-  const { isLoading: isPublishLoading, isSuccess: isPublishSuccess } = useWaitForTransactionReceipt({ hash: publishTxHash });
-  const publicClient = usePublicClient();
-  const [decrypting, setDecrypting] = useState(false);
-
   const handleDecryptAndPublish = async () => {
-    if (!publicClient) return;
+    if (!publicClient || !walletClient) {
+      setDecryptError("Connect your wallet before decrypting the result.");
+      return;
+    }
+    if (!address) {
+      setDecryptError("Connect Party A or Party B's wallet before decrypting the result.");
+      return;
+    }
+    if (!isViewerParty) {
+      setAccessDenied(true);
+      setDecryptError("Deal not found for this wallet. Only Party A or Party B can decrypt and publish this result.");
+      return;
+    }
     setDecrypting(true);
+    setDecryptError("");
+    setAccessDenied(false);
     try {
+      await initFHE(publicClient, walletClient);
+
       // 1. Fetch the encrypted handles from the contract
       const encResult = await publicClient.readContract({
         address: BLIND_NEGOTIATION_ADDRESS,
         abi: BLIND_NEGOTIATION_ABI,
         functionName: "getEncryptedResult",
         args: [id as `0x${string}`],
+        account: address,
       });
-      const [encPriceHandle, encMatchHandle] = encResult as [bigint, bigint];
-      
-      // Convert handles to strings for the SDK
-      const ctPrice = "0x" + encPriceHandle.toString(16);
-      const ctMatch = "0x" + encMatchHandle.toString(16);
+      const [ctPrice, ctMatch] = encResult as [`0x${string}`, `0x${string}`];
 
       // 2. Actually decrypt them using the Threshold Network (via Fhenix CoFHE)
-      // Note: We use the local fallback simulation if CoFHE isn't ready in demo
-      let decryptedMatch = false;
+      const matchResult = await decryptForTx(ctMatch);
+      const decryptedMatch = Boolean(matchResult.decryptedValue);
       let decryptedPrice = 0;
 
-      try {
-        // Try real decryption if CoFHE SDK is initialized
-        const matchResult = await decryptForTx(ctMatch);
-        decryptedMatch = Boolean(matchResult.decryptedValue);
-        if (decryptedMatch) {
-          const priceResult = await decryptForTx(ctPrice);
-          decryptedPrice = Number(priceResult.decryptedValue);
-        }
-      } catch (err) {
-        console.warn("Real CoFHE decrypt failed, falling back to local verification:", err);
-        // Fallback: the user submitted 2 vs 0.1, we simulate the correct logic
-        // If myPrice is present, we know at least one side.
-        decryptedMatch = false; // We know 0.1 < 2, so enforce false for the demo
-        decryptedPrice = 0;
+      if (decryptedMatch) {
+        const priceResult = await decryptForTx(ctPrice);
+        decryptedPrice = Number(priceResult.decryptedValue);
       }
 
       // 3. Publish the decrypted plaintext result to the contract!
@@ -213,17 +237,17 @@ export default function ResultPage() {
         args: [id as `0x${string}`, decryptedMatch, BigInt(decryptedPrice)],
       });
     } catch (err) {
-      console.error("Decrypt & Publish failed:", err);
+      console.warn("Decrypt & Publish failed:", err instanceof Error ? err.message : err);
+      const msg = err instanceof Error ? err.message : "Unable to decrypt and publish the result.";
+      if (msg.toLowerCase().includes("not a party")) {
+        setAccessDenied(true);
+        setDecryptError("Deal not found for this wallet. Switch to Party A or Party B to decrypt the result.");
+      } else {
+        setDecryptError(msg.length > 120 ? `${msg.slice(0, 120)}...` : msg);
+      }
       setDecrypting(false);
     }
   };
-
-  useEffect(() => {
-    if (isPublishSuccess) {
-      // It published! Reload page to see the new state
-      window.location.reload();
-    }
-  }, [isPublishSuccess]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -245,12 +269,14 @@ export default function ResultPage() {
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.15, type: "spring", stiffness: 220, damping: 18 }}
                   className="w-20 h-20 rounded-full mx-auto mb-5 flex items-center justify-center"
-                  style={matched
+                  style={matched && !isDealNotFoundForViewer
                     ? { background: "rgba(48,209,88,0.1)", border: "1px solid rgba(48,209,88,0.3)" }
                     : { background: "rgba(255,69,58,0.08)", border: "1px solid rgba(255,69,58,0.2)" }
                   }
                 >
-                  {isEncrypted ? (
+                  {isDealNotFoundForViewer ? (
+                    <XCircle className="w-10 h-10 text-[#ff453a]" strokeWidth={1.75} />
+                  ) : isEncrypted ? (
                     <Lock className="w-10 h-10 text-[#a78bfa]" strokeWidth={1.75} />
                   ) : matched ? (
                     <CheckCircle2 className="w-10 h-10 text-[#30d158]" strokeWidth={1.75} />
@@ -259,10 +285,12 @@ export default function ResultPage() {
                   )}
                 </motion.div>
                 <h1 className="sf-display text-[28px] sm:text-[36px] text-foreground mb-2">
-                  {isEncrypted ? "Result Encrypted" : matched ? "Prices Compared" : "No Overlap"}
+                  {isDealNotFoundForViewer ? "Deal Not Found" : isEncrypted ? "Result Encrypted" : matched ? "Prices Compared" : "No Overlap"}
                 </h1>
                 <p className="text-[15px] text-foreground/40 max-w-sm mx-auto leading-relaxed">
-                  {isEncrypted
+                  {isDealNotFoundForViewer
+                    ? "This connected wallet is not a party to the negotiation, so it cannot decrypt or publish the encrypted result."
+                    : isEncrypted
                     ? "The comparison finished, but the result is locked inside an FHE ciphertext."
                     : matched
                     ? "Both prices were submitted and compared using fully homomorphic encryption. The computation ran entirely in encrypted space. Neither party's number was ever revealed."
@@ -271,7 +299,28 @@ export default function ResultPage() {
               </div>
 
               {/* Agreed price — show if published, otherwise show encrypted status */}
-              {isEncrypted ? (
+              {isDealNotFoundForViewer ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.92 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="apple-card p-8 text-center"
+                  style={{ background: "rgba(255,69,58,0.06)", borderColor: "rgba(255,69,58,0.2)" }}
+                >
+                  <p className="text-[12px] font-semibold text-[#ff453a] uppercase tracking-widest mb-3">Not a Room Party</p>
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <XCircle className="w-8 h-8 text-[#ff453a]" strokeWidth={1.5} />
+                  </div>
+                  <p className="text-[14px] text-foreground/50 mb-4">
+                    No decryptable deal was found for this wallet. Switch to Party A or Party B, or wait for a party to publish the result.
+                  </p>
+                  <button
+                    onClick={() => navigate("/inbox")}
+                    className="btn-ghost w-full py-3 text-[14px] flex items-center justify-center gap-2"
+                  >
+                    Check Inbox
+                  </button>
+                </motion.div>
+              ) : isEncrypted ? (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.92 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -297,6 +346,9 @@ export default function ResultPage() {
                        <><Unlock className="w-4 h-4" /> Decrypt & Publish Result</>
                     )}
                   </button>
+                  {decryptError && (
+                    <p className="mt-3 text-[12px] text-[#ff453a] leading-relaxed">{decryptError}</p>
+                  )}
                 </motion.div>
               ) : matched ? (
                 <motion.div

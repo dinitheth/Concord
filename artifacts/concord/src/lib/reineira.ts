@@ -1,17 +1,9 @@
 /**
  * @module reineira
- * @description ReineiraOS ConfidentialEscrow integration
- *
- * Uses the @reineira-os/sdk for creating, funding, and redeeming
- * confidential escrows where even the contract never sees plaintext amounts.
- *
- * SDK: https://www.npmjs.com/package/@reineira-os/sdk
- * Docs: https://reineira.xyz/docs
- * Dev Toolkit: https://github.com/ReineiraOS/reineira-code
+ * @description ReineiraOS ConfidentialEscrow integration helpers.
  */
 import type { WalletClient } from "viem";
-
-// ── Types ───────────────────────────────────────────────────────
+import type { ReineiraSDK as ReineiraSDKType } from "@reineira-os/sdk";
 
 export interface EscrowConfig {
   agreedPrice: bigint;
@@ -26,55 +18,50 @@ export interface EscrowResult {
   status: "created" | "funded" | "redeemed" | "expired";
 }
 
-// ── ReineiraOS Escrow Integration ───────────────────────────────
+type ReineiraWalletClient = {
+  transport: { url?: string };
+  chain?: { id: number };
+  account: { address: string };
+  request: (...args: unknown[]) => Promise<unknown>;
+};
+
+async function createSdk(walletClient: WalletClient): Promise<ReineiraSDKType> {
+  if (!walletClient.account) {
+    throw new Error("Wallet account is required for ReineiraOS escrow actions.");
+  }
+
+  const { ReineiraSDK, walletClientToSigner } = await import("@reineira-os/sdk");
+  const signer = await walletClientToSigner(walletClient as unknown as ReineiraWalletClient);
+
+  return ReineiraSDK.create({
+    network: "testnet",
+    signer,
+    coordinatorUrl: "https://coordinator.reineira.io",
+    onFHEInit: (status: "starting" | "done" | "error") => console.log("[ReineiraOS] FHE:", status),
+  });
+}
 
 /**
- * Create a ConfidentialEscrow for the agreed deal price.
- *
- * Flow:
- *   1. Initialize the ReineiraOS SDK with FHE support
- *   2. Create an escrow with the agreed price (FHE-encrypted on-chain)
- *   3. Fund the escrow (deposit USDC → ConfidentialUSDC)
- *   4. Return escrow details for settlement tracking
+ * Create and fund a ReineiraOS escrow for the agreed deal price.
  */
 export async function createDealEscrow(config: EscrowConfig): Promise<EscrowResult> {
   const { agreedPrice, beneficiary, roomId, walletClient } = config;
 
   try {
-    // Dynamic import to avoid bundling issues if SDK not available
-    const { ReineiraSDK, walletClientToSigner } = await import("@reineira-os/sdk");
-
-    const signer = walletClientToSigner(walletClient);
-
-    const sdk = ReineiraSDK.create({
-      network: "testnet",
-      signer,
-      coordinatorUrl: "https://coordinator.reineira.io",
-      onFHEInit: (status: string) => console.log("[ReineiraOS] FHE:", status),
-    });
-
-    // Create the escrow — amount is encrypted via FHE before being sent on-chain
+    const sdk = await createSdk(walletClient);
     const escrow = await sdk.escrow.create({
-      beneficiary,
-      amount: Number(agreedPrice),
-      token: "USDC",
-      metadata: {
-        protocol: "concord",
-        roomId,
-        timestamp: Date.now(),
-      },
+      owner: beneficiary,
+      amount: agreedPrice,
     });
 
-    console.log("[ReineiraOS] Escrow created:", escrow.escrowId);
+    console.log("[ReineiraOS] Escrow created:", escrow.id.toString(), "for room", roomId);
 
-    // Fund the escrow (wraps USDC → ConfidentialUSDC)
-    const fundTx = await sdk.escrow.fund(escrow.escrowId, Number(agreedPrice));
-
-    console.log("[ReineiraOS] Escrow funded:", fundTx.transactionHash);
+    const fundResult = await escrow.fund(agreedPrice, { autoApprove: true });
+    console.log("[ReineiraOS] Escrow funded:", fundResult.tx.hash);
 
     return {
-      escrowId: escrow.escrowId,
-      txHash: fundTx.transactionHash,
+      escrowId: escrow.id.toString(),
+      txHash: fundResult.tx.hash,
       status: "funded",
     };
   } catch (err) {
@@ -84,30 +71,22 @@ export async function createDealEscrow(config: EscrowConfig): Promise<EscrowResu
 }
 
 /**
- * Redeem a funded escrow (called by the beneficiary after gate check).
+ * Redeem a funded escrow.
  */
 export async function redeemEscrow(
   escrowId: string,
   walletClient: WalletClient,
 ): Promise<EscrowResult> {
   try {
-    const { ReineiraSDK, walletClientToSigner } = await import("@reineira-os/sdk");
+    const sdk = await createSdk(walletClient);
+    const escrow = sdk.escrow.get(BigInt(escrowId));
+    const result = await escrow.redeem();
 
-    const signer = walletClientToSigner(walletClient);
-
-    const sdk = ReineiraSDK.create({
-      network: "testnet",
-      signer,
-      coordinatorUrl: "https://coordinator.reineira.io",
-    });
-
-    const result = await sdk.escrow.redeem(escrowId);
-
-    console.log("[ReineiraOS] Escrow redeemed:", result.transactionHash);
+    console.log("[ReineiraOS] Escrow redeemed:", result.hash);
 
     return {
       escrowId,
-      txHash: result.transactionHash,
+      txHash: result.hash,
       status: "redeemed",
     };
   } catch (err) {
@@ -117,29 +96,22 @@ export async function redeemEscrow(
 }
 
 /**
- * Check the status of an escrow.
+ * Check whether a ReineiraOS escrow exists and has been funded.
  */
 export async function getEscrowStatus(
   escrowId: string,
   walletClient: WalletClient,
 ): Promise<EscrowResult> {
   try {
-    const { ReineiraSDK, walletClientToSigner } = await import("@reineira-os/sdk");
-
-    const signer = walletClientToSigner(walletClient);
-
-    const sdk = ReineiraSDK.create({
-      network: "testnet",
-      signer,
-      coordinatorUrl: "https://coordinator.reineira.io",
-    });
-
-    const status = await sdk.escrow.status(escrowId);
+    const sdk = await createSdk(walletClient);
+    const escrow = sdk.escrow.get(BigInt(escrowId));
+    const exists = await escrow.exists();
+    const isFunded = exists ? await escrow.isFunded() : false;
 
     return {
       escrowId,
       txHash: "",
-      status: status.state as "created" | "funded" | "redeemed" | "expired",
+      status: isFunded ? "funded" : exists ? "created" : "expired",
     };
   } catch (err) {
     console.error("[ReineiraOS] Status check failed:", err);

@@ -96,8 +96,8 @@ export const BLIND_NEGOTIATION_ABI = [
     name: "getEncryptedResult",
     inputs: [{ name: "roomId", type: "bytes32" }],
     outputs: [
-      { name: "encAgreedPrice", type: "uint256" },
-      { name: "encMatched", type: "uint256" },
+      { name: "encAgreedPrice", type: "bytes32" },
+      { name: "encMatched", type: "bytes32" },
     ],
     stateMutability: "view",
   },
@@ -255,8 +255,8 @@ export const BLIND_NEGOTIATION_ABI = [
     name: "getEncryptedResult",
     inputs: [{ name: "roomId", type: "bytes32" }],
     outputs: [
-      { name: "encAgreedPrice", type: "uint256" },
-      { name: "encMatched", type: "uint256" }
+      { name: "encAgreedPrice", type: "bytes32" },
+      { name: "encMatched", type: "bytes32" }
     ],
     stateMutability: "view",
   },
