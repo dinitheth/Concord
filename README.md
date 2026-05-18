@@ -149,9 +149,28 @@ contract BlindNegotiation {
 - **Initiator (Party A):** Sets a minimum acceptable price (floor).
 - **Counterparty (Party B):** Sets a maximum willingness to pay (ceiling).
 
-### Deal Condition
+### The Math: Floor vs. Ceiling
 
-A deal exists if `ceiling >= floor`. The agreed price is the midpoint: `(floor + ceiling) / 2`.
+In Concord, negotiations are strictly asymmetric. One party is selling, the other is buying.
+
+*   **Party A (Room Creator) sets the FLOOR.**
+    *   This is the **Seller's minimum**. They are saying: *"I will absolutely not accept anything less than X."*
+*   **Party B (Receiver) sets the CEILING.**
+    *   This is the **Buyer's maximum**. They are saying: *"I will absolutely not pay a single penny more than Y."*
+
+**The Rule:** A deal ONLY happens if the Buyer's Ceiling is greater than or equal to the Seller's Floor (`Ceiling >= Floor`).
+
+#### Scenario 1: NO DEAL (e.g., 80M vs 20M)
+*   **Seller (Floor):** 80M
+*   **Buyer (Ceiling):** 20M
+*   **Math:** Does 20M >= 80M? **No.**
+*   **Outcome:** "No Overlap". The UI decrypts the result as a false match. The Escrow contract fully refunds the Buyer. Neither party learns the other's number.
+
+#### Scenario 2: DEAL FOUND (e.g., 80M vs 95M)
+*   **Seller (Floor):** 80M
+*   **Buyer (Ceiling):** 95M
+*   **Math:** Does 95M >= 80M? **Yes!**
+*   **Outcome:** "Prices Compared". The contract mathematically computes the exact midpoint: `(80M + 95M) / 2 = 87.5M`. The agreed settlement price becomes **87.5M**. The Escrow contract trustlessly transfers 87.5M to the Seller and refunds the 7.5M remainder to the Buyer.
 
 ### Privacy Guarantee
 
@@ -257,8 +276,8 @@ Wave 4 adds the financial execution layer to Concord. Instead of stopping at pri
 
 | Contract | Address |
 |---|---|
-| `BlindNegotiation` | [`0x692F55eBca2fd5E7826e9bc97450Ad7f06A6a8C3`](https://sepolia.basescan.org/address/0x692F55eBca2fd5E7826e9bc97450Ad7f06A6a8C3) |
-| `ConfidentialEscrow` | [`0xa1682178715f50b794107e03494DF044B53631C7`](https://sepolia.basescan.org/address/0xa1682178715f50b794107e03494DF044B53631C7) |
+| `BlindNegotiation` | [`0xEB81D05a54068A662aD7aC62CF1Df91cD5e9DdE6`](https://sepolia.basescan.org/address/0xEB81D05a54068A662aD7aC62CF1Df91cD5e9DdE6) |
+| `ConfidentialEscrow` | [`0x4B5c130ad2BD8A9CDfa062E2B9d7a655Db757F3A`](https://sepolia.basescan.org/address/0x4B5c130ad2BD8A9CDfa062E2B9d7a655Db757F3A) |
 | `USDC` (Base Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
 ### Wave 4 Settlement Flow

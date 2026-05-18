@@ -260,7 +260,6 @@ export default function CreateRoom() {
         args: [roomId as `0x${string}`, recipient as `0x${string}`],
         chain: walletClient.chain,
         account: walletClient.account,
-        gas: 200_000n, // explicit limit — sidesteps gas estimation revert
       });
       // Wait for confirmation
       await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });

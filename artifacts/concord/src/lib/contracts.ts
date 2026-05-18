@@ -249,6 +249,29 @@ export const BLIND_NEGOTIATION_ABI = [
       { name: "timestamp", type: "uint256", indexed: false },
     ],
   },
+  // getEncryptedResult
+  {
+    type: "function",
+    name: "getEncryptedResult",
+    inputs: [{ name: "roomId", type: "bytes32" }],
+    outputs: [
+      { name: "encAgreedPrice", type: "uint256" },
+      { name: "encMatched", type: "uint256" }
+    ],
+    stateMutability: "view",
+  },
+  // publishResult
+  {
+    type: "function",
+    name: "publishResult",
+    inputs: [
+      { name: "roomId", type: "bytes32" },
+      { name: "_matched", type: "bool" },
+      { name: "_agreedPrice", type: "uint64" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
   // Wave 4: getPublishedResult (used by ConfidentialEscrow)
   {
     type: "function",

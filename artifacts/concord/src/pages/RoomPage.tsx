@@ -336,8 +336,9 @@ export default function RoomPage() {
         const updatedRoom: Room = {
           ...room,
           partyB: { address: walletAddr!, timestamp: Date.now() },
+          myPrice: Number(parsedPrice),
           status: "settled",
-          result: { matched: true, timestamp: Date.now(), txHash: hash },
+          result: { matched: false, isEncrypted: true, timestamp: Date.now(), txHash: hash } as any,
         };
         saveRoom(updatedRoom);
         setRoom(updatedRoom);
