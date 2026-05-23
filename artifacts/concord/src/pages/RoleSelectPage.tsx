@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { Plus, LogIn, ArrowRight } from "lucide-react";
+import { Plus, LogIn, ArrowRight, Gavel } from "lucide-react";
 import NavBar from "@/components/NavBar";
 import FHEBadge from "@/components/FHEBadge";
 
@@ -29,7 +29,7 @@ export default function RoleSelectPage() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-4xl">
           {/* Create Room (Party A) */}
           <motion.button
             initial={{ opacity: 0, y: 24 }}
@@ -95,6 +95,46 @@ export default function RoleSelectPage() {
                   <div
                     className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold"
                     style={{ background: "rgba(48,209,88,0.12)", color: "#30d158" }}
+                  >
+                    {i + 1}
+                  </div>
+                  <span className="text-[12px] text-foreground/35">{step}</span>
+                </div>
+              ))}
+            </div>
+          </motion.button>
+
+          {/* Sealed-Bid Auction (Wave 5) */}
+          <motion.button
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.26, ease: [0.32, 0, 0, 1] }}
+            onClick={() => navigate("/auction/create")}
+            className="group text-left apple-card p-7 hover:bg-black/5 dark:hover:bg-[#1a0f00] transition-all duration-200 cursor-pointer"
+            style={{ borderColor: "#ff9500" }}
+          >
+            <div className="flex items-center gap-2 mb-5">
+              <div
+                className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                style={{ background: "rgba(255,149,0,0.1)" }}
+              >
+                <Gavel className="w-6 h-6 text-[#ff9500]" strokeWidth={2} />
+              </div>
+              <span className="text-[9px] font-extrabold px-2 py-0.5 rounded" style={{ background: "rgba(255,149,0,0.12)", color: "#ff9500", border: "1px solid rgba(255,149,0,0.2)" }}>NEW</span>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="sf-display text-[22px] text-foreground">Sealed-Bid Auction</h2>
+              <ArrowRight className="w-5 h-5 text-foreground/20 group-hover:text-[#ff9500] group-hover:translate-x-1 transition-all duration-200" />
+            </div>
+            <p className="text-[13px] text-foreground/40 leading-relaxed mb-5">
+              Multiple bidders submit encrypted bids against your floor. FHE finds the highest qualifying bid — no one sees any number.
+            </p>
+            <div className="space-y-2">
+              {["Set floor price, invite N bidders", "Bidders submit encrypted ceilings", "FHE tournament finds the winner"].map((step, i) => (
+                <div key={i} className="flex items-center gap-2.5">
+                  <div
+                    className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold"
+                    style={{ background: "rgba(255,149,0,0.12)", color: "#ff9500" }}
                   >
                     {i + 1}
                   </div>

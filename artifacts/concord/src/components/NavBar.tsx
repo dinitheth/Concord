@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Inbox, Wallet, Sun, Moon, User } from "lucide-react";
+import { Inbox, Wallet, Sun, Moon, User, Gavel } from "lucide-react";
 import { useAccount, useReadContract } from "wagmi";
 import { useModal } from "connectkit";
 import ConcordLogo from "@/components/ConcordLogo";
@@ -96,6 +96,22 @@ export default function NavBar() {
         <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
           <Link href="/negotiate" className="hidden md:block text-[13px] hover:text-foreground transition-colors font-medium shrink-0" style={{ color: "var(--text-secondary)" }}>
             How it Works
+          </Link>
+
+          {/* Auctions */}
+          <Link href="/auction/create" className="shrink-0 flex-shrink-0">
+            <button
+              className="relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-full transition-all duration-200"
+              style={{
+                background: location.startsWith("/auction") ? "rgba(255,149,0,0.1)" : "var(--subtle-bg)",
+                border: location.startsWith("/auction") ? "1px solid rgba(255,149,0,0.3)" : "1px solid var(--card-border-color)",
+                color: location.startsWith("/auction") ? "#ff9500" : "hsl(var(--foreground))",
+                opacity: location.startsWith("/auction") ? 1 : 0.7
+              }}
+            >
+              <Gavel className="w-3.5 h-3.5 shrink-0" />
+              <span className="text-[12px] font-medium hidden sm:inline">Auctions</span>
+            </button>
           </Link>
 
           {/* On-Chain Inbox */}

@@ -508,6 +508,36 @@ export default function CreateRoom() {
                         </div>
                       </div>
 
+                      {/* Industry-specific dashboard fields (Wave 5) */}
+                      {meta.dashboardFields && meta.dashboardFields.length > 0 && (
+                        <div>
+                          <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "hsl(var(--foreground))", opacity: 0.7, marginBottom: 10 }}>{meta.label} Details</label>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                            {meta.dashboardFields.map(field => (
+                              <div key={field.key} style={{ gridColumn: field.type === "text" && field.key.includes("Address") ? "1 / -1" : undefined }}>
+                                <label style={{ display: "block", fontSize: 11, color: "hsl(var(--foreground))", opacity: 0.5, marginBottom: 4 }}>{field.label}</label>
+                                {field.type === "select" ? (
+                                  <select
+                                    className="apple-input"
+                                    style={{ width: "100%", padding: "10px 14px", borderRadius: 12, fontSize: 13, fontWeight: 500, background: "hsl(var(--input))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))", outline: "none" }}
+                                  >
+                                    <option value="">{field.placeholder}</option>
+                                    {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type={field.type}
+                                    placeholder={field.placeholder}
+                                    className="apple-input"
+                                    style={{ width: "100%", padding: "10px 14px", borderRadius: 12, fontSize: 13, fontWeight: 500, background: "hsl(var(--input))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))", outline: "none" }}
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div>
                         <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "hsl(var(--foreground))", opacity: 0.7, marginBottom: 8 }}>Offer expires</label>
                         <div style={{ display: "flex", gap: 12 }}>

@@ -360,7 +360,7 @@ export default function ResultPage() {
                 >
                   {displayPrice && (
                     <>
-                      <p className="text-[12px] font-semibold text-[#30d158]/60 uppercase tracking-widest mb-3">Agreed Price</p>
+                      <p className="text-[12px] font-semibold text-[#30d158]/60 uppercase tracking-widest mb-3">{meta.resultLabel || "Agreed Price"}</p>
                       <div className="sf-display text-[40px] sm:text-[52px] md:text-[64px] leading-none text-foreground mb-3" style={{ color: "#30d158" }}>
                         {displayPrice}
                       </div>

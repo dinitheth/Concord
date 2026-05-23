@@ -546,3 +546,250 @@ export function mapOnChainStatus(status: number): "open" | "pending_b" | "comput
     default: return "open";
   }
 }
+
+// ── Wave 5: Multi-Party Auction ─────────────────────────────────
+
+export const MULTI_PARTY_AUCTION_ADDRESS: Address = "0xE3cfEDb40575412574d1107730ade283237Ab1df";
+
+export const MULTI_PARTY_AUCTION_ABI = [
+  // createAuction
+  {
+    type: "function",
+    name: "createAuction",
+    inputs: [
+      { name: "auctionId", type: "bytes32" },
+      { name: "encFloor", type: "tuple", components: [
+        { name: "ctHash", type: "uint256" },
+        { name: "securityZone", type: "uint8" },
+        { name: "utype", type: "uint8" },
+        { name: "signature", type: "bytes" },
+      ]},
+      { name: "nType", type: "uint8" },
+      { name: "deadline", type: "uint256" },
+      { name: "maxBidders", type: "uint8" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  // submitBid
+  {
+    type: "function",
+    name: "submitBid",
+    inputs: [
+      { name: "auctionId", type: "bytes32" },
+      { name: "encCeiling", type: "tuple", components: [
+        { name: "ctHash", type: "uint256" },
+        { name: "securityZone", type: "uint8" },
+        { name: "utype", type: "uint8" },
+        { name: "signature", type: "bytes" },
+      ]},
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  // computeAuction
+  {
+    type: "function",
+    name: "computeAuction",
+    inputs: [{ name: "auctionId", type: "bytes32" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  // publishResult
+  {
+    type: "function",
+    name: "publishResult",
+    inputs: [
+      { name: "auctionId", type: "bytes32" },
+      { name: "_matched", type: "bool" },
+      { name: "_agreedPrice", type: "uint64" },
+      { name: "_winner", type: "address" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  // getAuctionInfo
+  {
+    type: "function",
+    name: "getAuctionInfo",
+    inputs: [{ name: "auctionId", type: "bytes32" }],
+    outputs: [
+      { name: "seller", type: "address" },
+      { name: "status", type: "uint8" },
+      { name: "createdAt", type: "uint256" },
+      { name: "deadline", type: "uint256" },
+      { name: "negotiationType", type: "uint8" },
+      { name: "maxBidders", type: "uint8" },
+      { name: "currentBids", type: "uint8" },
+      { name: "isResultPublished", type: "bool" },
+      { name: "matched", type: "bool" },
+      { name: "agreedPrice", type: "uint64" },
+      { name: "winner", type: "address" },
+    ],
+    stateMutability: "view",
+  },
+  // getBidCount
+  {
+    type: "function",
+    name: "getBidCount",
+    inputs: [{ name: "auctionId", type: "bytes32" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  // getBidder
+  {
+    type: "function",
+    name: "getBidder",
+    inputs: [
+      { name: "auctionId", type: "bytes32" },
+      { name: "index", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  // getEncryptedResult
+  {
+    type: "function",
+    name: "getEncryptedResult",
+    inputs: [{ name: "auctionId", type: "bytes32" }],
+    outputs: [
+      { name: "encAgreedPrice", type: "bytes32" },
+      { name: "encHasWinner", type: "bytes32" },
+    ],
+    stateMutability: "view",
+  },
+  // getPublishedResult
+  {
+    type: "function",
+    name: "getPublishedResult",
+    inputs: [{ name: "auctionId", type: "bytes32" }],
+    outputs: [
+      { name: "isPublished", type: "bool" },
+      { name: "matched", type: "bool" },
+      { name: "agreedPrice", type: "uint64" },
+      { name: "winner", type: "address" },
+    ],
+    stateMutability: "view",
+  },
+  // auctionExists
+  {
+    type: "function",
+    name: "auctionExists",
+    inputs: [{ name: "", type: "bytes32" }],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+  // sendInvite
+  {
+    type: "function",
+    name: "sendInvite",
+    inputs: [
+      { name: "auctionId", type: "bytes32" },
+      { name: "recipient", type: "address" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  // getReceivedInvites
+  {
+    type: "function",
+    name: "getReceivedInvites",
+    inputs: [{ name: "recipient", type: "address" }],
+    outputs: [
+      { name: "", type: "tuple[]", components: [
+        { name: "auctionId", type: "bytes32" },
+        { name: "sender", type: "address" },
+        { name: "timestamp", type: "uint256" },
+        { name: "negotiationType", type: "uint8" },
+      ]},
+    ],
+    stateMutability: "view",
+  },
+  // Events
+  {
+    type: "event",
+    name: "AuctionCreated",
+    inputs: [
+      { name: "auctionId", type: "bytes32", indexed: true },
+      { name: "seller", type: "address", indexed: true },
+      { name: "nType", type: "uint8", indexed: false },
+      { name: "deadline", type: "uint256", indexed: false },
+      { name: "maxBidders", type: "uint8", indexed: false },
+      { name: "timestamp", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "BidSubmitted",
+    inputs: [
+      { name: "auctionId", type: "bytes32", indexed: true },
+      { name: "bidder", type: "address", indexed: true },
+      { name: "bidIndex", type: "uint8", indexed: false },
+      { name: "timestamp", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "AuctionComputed",
+    inputs: [
+      { name: "auctionId", type: "bytes32", indexed: true },
+      { name: "totalBids", type: "uint8", indexed: false },
+      { name: "timestamp", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "AuctionResultPublished",
+    inputs: [
+      { name: "auctionId", type: "bytes32", indexed: true },
+      { name: "matched", type: "bool", indexed: false },
+      { name: "agreedPrice", type: "uint64", indexed: false },
+      { name: "winner", type: "address", indexed: false },
+      { name: "timestamp", type: "uint256", indexed: false },
+    ],
+  },
+] as const;
+
+export enum AuctionStatus {
+  Open = 0,
+  BiddingOpen = 1,
+  Computing = 2,
+  Settled = 3,
+  Expired = 4,
+}
+
+export interface OnChainAuction {
+  seller: Address;
+  status: AuctionStatus;
+  createdAt: bigint;
+  deadline: bigint;
+  negotiationType: number;
+  maxBidders: number;
+  currentBids: number;
+  isResultPublished: boolean;
+  matched: boolean;
+  agreedPrice: bigint;
+  winner: Address;
+}
+
+export const auctionConfig = {
+  address: MULTI_PARTY_AUCTION_ADDRESS,
+  abi: MULTI_PARTY_AUCTION_ABI,
+  chainId: baseSepolia.id,
+} as const;
+
+export function mapAuctionStatus(status: number): "open" | "bidding" | "computing" | "settled" | "expired" {
+  switch (status) {
+    case 0: return "open";
+    case 1: return "bidding";
+    case 2: return "computing";
+    case 3: return "settled";
+    case 4: return "expired";
+    default: return "open";
+  }
+}
+
+export function getAuctionExplorerUrl(): string {
+  return `https://sepolia.basescan.org/address/${MULTI_PARTY_AUCTION_ADDRESS}`;
+}
+
