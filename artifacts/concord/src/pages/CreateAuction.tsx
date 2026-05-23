@@ -189,9 +189,14 @@ export default function CreateAuction() {
             <div className="grid grid-cols-2 gap-2 mb-6">
               {(Object.keys(NEGOTIATION_TYPES) as NegotiationType[]).map(k => (
                 <button key={k} onClick={() => setType(k)}
-                  className={`apple-card px-4 py-3 text-left transition-all ${type === k ? "ring-1 ring-[#ff9500]" : ""}`}>
-                  <div className="text-[13px] font-semibold text-foreground">{NEGOTIATION_TYPES[k].label}</div>
-                  <div className="text-[11px] text-foreground/40 mt-0.5">{NEGOTIATION_TYPES[k].description}</div>
+                  className="apple-card px-4 py-3 text-left transition-all duration-200"
+                  style={{
+                    background: type === k ? "rgba(255,149,0,0.08)" : undefined,
+                    borderColor: type === k ? "rgba(255,149,0,0.5)" : undefined,
+                    boxShadow: type === k ? "0 0 20px rgba(255,149,0,0.08), inset 0 0 0 1px rgba(255,149,0,0.15)" : undefined,
+                  }}>
+                  <div className="text-[13px] font-semibold" style={{ color: type === k ? "#ff9500" : "hsl(var(--foreground))" }}>{NEGOTIATION_TYPES[k].label}</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: type === k ? "rgba(255,149,0,0.6)" : "hsl(var(--foreground) / 0.4)" }}>{NEGOTIATION_TYPES[k].description}</div>
                 </button>
               ))}
             </div>

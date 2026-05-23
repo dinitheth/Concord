@@ -369,6 +369,107 @@ export default function NegotiatePage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* ── Wave 5: Sealed-Bid Auction Explainer ────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.5 }}
+          className="mt-12 pt-10"
+          style={{ borderTop: "1px solid hsl(var(--border))" }}
+        >
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4" style={{ background: "rgba(255,149,0,0.08)", border: "1px solid rgba(255,149,0,0.2)" }}>
+              <span className="text-[11px] font-bold text-[#ff9500] uppercase tracking-wider">New: Wave 5</span>
+            </div>
+            <h2 className="sf-display text-[24px] sm:text-[30px] text-foreground mb-2">Multi-Party Sealed-Bid Auctions</h2>
+            <p className="text-[14px] text-foreground/40 max-w-lg mx-auto leading-relaxed">
+              Multiple bidders submit encrypted ceilings against a seller's encrypted floor. An FHE tournament bracket finds the highest qualifying bid — no one sees any number.
+            </p>
+          </div>
+
+          {/* How the auction works — step by step */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            {[
+              {
+                step: "1",
+                title: "Seller Creates Auction",
+                desc: "Encrypts floor price on-device, sets max bidders (2-10), deadline, and industry-specific metadata.",
+                color: "#0a84ff",
+              },
+              {
+                step: "2",
+                title: "Bidders Submit Sealed Bids",
+                desc: "Each bidder encrypts their ceiling price. On-chain, they're stored as euint64 ciphertext — invisible to everyone.",
+                color: "#5ac8fa",
+              },
+              {
+                step: "3",
+                title: "FHE Tournament Bracket",
+                desc: "The contract runs pairwise FHE.gte() comparisons to find the highest eligible bid and computes the encrypted midpoint.",
+                color: "#ff9500",
+              },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className="apple-card p-5"
+                style={{ borderColor: `${item.color}30` }}
+              >
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold mb-3"
+                  style={{ background: `${item.color}15`, color: item.color }}
+                >
+                  {item.step}
+                </div>
+                <h3 className="text-[14px] font-semibold text-foreground mb-1">{item.title}</h3>
+                <p className="text-[12px] text-foreground/35 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* FHE Tournament visual */}
+          <div className="apple-card p-6 mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Zap className="w-4 h-4 text-[#ff9500]" />
+              <span className="text-[13px] font-semibold text-foreground">FHE Tournament Logic</span>
+            </div>
+            <div className="font-mono text-[12px] text-foreground/50 space-y-1.5 leading-relaxed">
+              <div><span className="text-[#5ac8fa]">for each bid</span> in bidders:</div>
+              <div className="pl-4">isEligible = <span className="text-[#ff9500]">FHE.gte</span>(bid.ceiling, seller.floor)</div>
+              <div className="pl-4">isBetter = <span className="text-[#ff9500]">FHE.gte</span>(bid, currentBest)</div>
+              <div className="pl-4">currentBest = <span className="text-[#ff9500]">FHE.select</span>(isEligible AND isBetter, bid, currentBest)</div>
+              <div className="mt-2">agreedPrice = <span className="text-[#30d158]">FHE.div</span>(<span className="text-[#30d158]">FHE.add</span>(floor, bestBid), 2)</div>
+              <div className="mt-2 text-foreground/25 text-[11px]">// All operations run on encrypted ciphertexts — zero values are ever decrypted during computation</div>
+            </div>
+          </div>
+
+          {/* Industry dashboards */}
+          <div className="text-center mb-6">
+            <h3 className="text-[18px] font-bold text-foreground mb-1">Industry-Specific Dashboards</h3>
+            <p className="text-[13px] text-foreground/35">Each deal type carries specialized metadata alongside the encrypted core</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+            {[
+              { type: "M&A Deal", fields: "Company, ARR, Employees, Stage", color: "#0a84ff" },
+              { type: "Salary", fields: "Role, Department, Location, Model", color: "#30d158" },
+              { type: "Real Estate", fields: "Address, Sq Ft, Beds, Year", color: "#ff9500" },
+              { type: "Custom", fields: "Flexible — any two-party deal", color: "#a78bfa" },
+            ].map((item, i) => (
+              <div key={i} className="apple-card p-4 text-center">
+                <div className="text-[12px] font-bold mb-1" style={{ color: item.color }}>{item.type}</div>
+                <div className="text-[11px] text-foreground/30 leading-relaxed">{item.fields}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <div className="text-center">
+            <a href="/auction/create" className="btn-apple px-8 py-3 text-[14px] inline-flex items-center gap-2">
+              Create a Sealed-Bid Auction <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+        </motion.div>
+
       </div>
     </div>
   );

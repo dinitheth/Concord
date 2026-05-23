@@ -1,13 +1,17 @@
-# Concord — Blind Negotiation Protocol
+# Concord — Blind Negotiation & Sealed-Bid Auction Protocol
 
 > **Private price discovery powered by Fully Homomorphic Encryption.**
 > Built with [Base](https://base.org) & [Fhenix CoFHE](https://fhenix.io).
 
-Two parties submit encrypted reservation prices on-chain. The smart contract compares them, computes a midpoint — all in encrypted space. Neither party's number is ever revealed. Only the outcome is decrypted.
+Concord lets parties discover whether they have a deal — and at what price — without revealing their private numbers. Whether it's a 1-on-1 negotiation or a multi-party sealed-bid auction, every price is encrypted in the browser using the CoFHE SDK before it touches the blockchain. Smart contracts compare encrypted numbers and compute fair midpoints, all while the values remain fully encrypted ciphertext.
 
 ---
 
-## How It Works
+## Two Modes of Operation
+
+### 1. Blind Negotiation (1-on-1)
+
+Two parties submit encrypted reservation prices. The contract compares them and computes a midpoint — all in encrypted space.
 
 ```
 Party A: enters floor price → encrypted in browser via CoFHE SDK
@@ -27,6 +31,33 @@ Party B: enters ceiling price → encrypted in browser via CoFHE SDK
                                     ↓
                     Result: Deal found at $87.5M
                     (neither $80M floor nor $95M ceiling was revealed)
+```
+
+### 2. Sealed-Bid Auction (Multi-Party) — Wave 5
+
+A seller sets an encrypted floor price. Multiple bidders (2-10) submit encrypted ceilings. The contract runs an **FHE tournament bracket** to find the highest qualifying bid.
+
+```
+Seller: encrypts floor price → euint64 on-chain
+                                    ↓
+Bidder 1: encrypts ceiling → euint64 on-chain
+Bidder 2: encrypts ceiling → euint64 on-chain
+Bidder 3: encrypts ceiling → euint64 on-chain
+    ...N bidders...
+                                    ↓
+            ┌──────────────────────────────────────────┐
+            │   for each bid:                          │
+            │     isEligible = FHE.gte(bid, floor)     │
+            │     isBetter   = FHE.gte(bid, bestBid)   │
+            │     bestBid    = FHE.select(both, bid,   │
+            │                             bestBid)     │
+            │   agreedPrice  = FHE.div(                │
+            │                   FHE.add(floor, best),  │
+            │                   2)                     │
+            └──────────────────────────────────────────┘
+                                    ↓
+            Result: Winner found at $92.5M
+            (no bidder's number or rank was ever revealed)
 ```
 
 ---
@@ -52,32 +83,32 @@ After this, the plaintext number **no longer exists**. Only an encrypted blob go
 The smart contract performs arithmetic on encrypted values — without ever decrypting them:
 
 ```solidity
-// Step 1: Compare two ENCRYPTED numbers
+// 1-on-1 Negotiation (BlindNegotiation.sol)
 ebool hasMatch = FHE.gte(room.partyBPrice, room.partyAPrice);
-// → Answers "Is ceiling >= floor?" while BOTH remain encrypted
-
-// Step 2: Add two ENCRYPTED numbers
 euint64 encSum = FHE.add(room.partyAPrice, room.partyBPrice);
-
-// Step 3: Divide ENCRYPTED result
 euint64 encMidpoint = FHE.div(encSum, FHE.asEuint64(2));
-
-// Step 4: Conditional select on ENCRYPTED boolean
 euint64 encAgreed = FHE.select(hasMatch, encMidpoint, FHE.asEuint64(0));
-```
 
-**The EVM computed $87.5M as the agreed price without ever knowing Party A said $80M or Party B said $95M.**
+// Multi-Party Auction (MultiPartyAuction.sol)
+// Pairwise tournament — for each bid:
+ebool isEligible = FHE.gte(bid, sellerFloor);
+ebool isBetter = FHE.gte(bid, currentBest);
+ebool shouldReplace = FHE.and(isEligible, isBetter);
+currentBest = FHE.select(shouldReplace, bid, currentBest);
+// Final midpoint:
+euint64 agreedPrice = FHE.div(FHE.add(floor, bestBid), 2);
+```
 
 ### What's Visible on the Blockchain
 
 | Data | Visible? | Format |
 |------|----------|--------|
 | Party addresses | ✅ Public | `0x720392Bb...` |
-| Party A's price | ❌ **Never** | Stored as `euint64` ciphertext |
-| Party B's price | ❌ **Never** | Stored as `euint64` ciphertext |
-| Match result | ❌ Encrypted | Stored as `ebool` ciphertext |
+| Floor / ceiling prices | ❌ **Never** | Stored as `euint64` ciphertext |
+| Individual bid amounts | ❌ **Never** | Stored as `euint64` ciphertext |
+| Match / winner result | ❌ Encrypted | Stored as `ebool` ciphertext |
 | Agreed price | ❌ Encrypted | Stored as `euint64` ciphertext |
-| Room status | ✅ Public | Plain enum |
+| Room / auction status | ✅ Public | Plain enum |
 
 ### FHE Operations Used
 
@@ -88,13 +119,14 @@ euint64 encAgreed = FHE.select(hasMatch, encMidpoint, FHE.asEuint64(0));
 | Add | `FHE.add(a, b)` | Addition → encrypted sum |
 | Divide | `FHE.div(a, b)` | Division → encrypted quotient |
 | Conditional | `FHE.select(cond, a, b)` | If-else → encrypted result |
+| Logical AND | `FHE.and(a, b)` | Boolean AND → encrypted bool |
 | Access control | `FHE.allow(ct, addr)` | Grant decryption permission |
 
 ---
 
-## Smart Contract
+## Smart Contracts
 
-### BlindNegotiation.sol
+### BlindNegotiation.sol (1-on-1)
 
 **Network:** Base Sepolia  
 **Address:** `0xd7FA8ad77cfAa55674af496088f8D3723F9ff402`
@@ -118,27 +150,67 @@ contract BlindNegotiation {
 
     function createRoom(bytes32 roomId, InEuint64 calldata encFloor,
                         uint8 nType, uint256 deadline) external;
-
     function sendInvite(bytes32 roomId, address recipient) external;
-
     function joinAndCompute(bytes32 roomId,
                             InEuint64 calldata encCeiling) external;
-
     function publishResult(bytes32 roomId, bool _matched,
                            uint64 _agreedPrice) external;
 }
 ```
 
+### MultiPartyAuction.sol (Sealed-Bid) — Wave 5
+
+**Network:** Base Sepolia  
+**Address:** `0xE3cfEDb40575412574d1107730ade283237Ab1df`
+
+```solidity
+contract MultiPartyAuction {
+    enum AuctionStatus { Open, Bidding, Computing, Settled, Expired }
+
+    struct Auction {
+        address seller;
+        euint64 sellerFloor;       // Encrypted floor price
+        AuctionStatus status;
+        uint256 deadline;
+        uint8 maxBidders;
+        uint8 negotiationType;
+        // Bids stored as array of encrypted euint64 values
+    }
+
+    function createAuction(bytes32 auctionId, InEuint64 calldata encFloor,
+                           uint8 nType, uint256 deadline, uint8 maxBidders) external;
+    function submitBid(bytes32 auctionId, InEuint64 calldata encCeiling) external;
+    function computeAuction(bytes32 auctionId) external;     // FHE tournament
+    function publishResult(bytes32 auctionId, bool matched,
+                           uint256 agreedPrice, address winner) external;
+    function sendInvite(bytes32 auctionId, address recipient) external;
+}
+```
+
 ### Contract Functions
 
-| Function | Called By | What It Does |
-|----------|-----------|--------------|
-| `createRoom` | Initiator | Stores encrypted floor price, creates room |
-| `sendInvite` | Initiator | Sends on-chain invite to counterparty wallet |
-| `joinAndCompute` | Counterparty | Stores encrypted ceiling, runs full FHE circuit |
-| `publishResult` | Either party | Publishes decrypted result on-chain |
-| `getRoomInfo` | Anyone | Returns room state (addresses, status, published result) |
-| `getReceivedInvites` | Anyone | Returns invites for a wallet address |
+| Function | Contract | Called By | What It Does |
+|----------|----------|-----------|--------------|
+| `createRoom` | BlindNegotiation | Initiator | Stores encrypted floor price, creates room |
+| `joinAndCompute` | BlindNegotiation | Counterparty | Stores encrypted ceiling, runs FHE circuit |
+| `createAuction` | MultiPartyAuction | Seller | Stores encrypted floor, sets bidder cap & deadline |
+| `submitBid` | MultiPartyAuction | Bidder | Encrypts and stores sealed ceiling bid |
+| `computeAuction` | MultiPartyAuction | Anyone | Runs FHE tournament bracket to find winner |
+| `sendInvite` | Both | Room/Auction creator | On-chain invite to counterparty wallet |
+| `publishResult` | Both | Either party | Publishes decrypted result on-chain |
+
+---
+
+## Industry-Specific Dashboards
+
+Each negotiation or auction can be tagged with industry metadata. The encrypted core is identical — only the surrounding context changes.
+
+| Type | Dashboard Fields | Result Label |
+|------|-----------------|--------------|
+| **M&A Deal** | Company Name, ARR, Employee Count, Funding Stage | Acquisition Price |
+| **Salary** | Role Title, Department, Location, Work Model | Agreed Compensation |
+| **Real Estate** | Property Address, Sq Ft, Bed/Bath, Year Built | Agreed Purchase Price |
+| **Custom** | (none — flexible) | Agreed Price |
 
 ---
 
@@ -146,38 +218,26 @@ contract BlindNegotiation {
 
 ### Participants
 
+**1-on-1 Negotiation:**
 - **Initiator (Party A):** Sets a minimum acceptable price (floor).
 - **Counterparty (Party B):** Sets a maximum willingness to pay (ceiling).
 
-### The Math: Floor vs. Ceiling
+**Multi-Party Auction:**
+- **Seller:** Sets an encrypted floor price and max bidder count.
+- **Bidders (2-10):** Each submits an encrypted ceiling price.
 
-In Concord, negotiations are strictly asymmetric. One party is selling, the other is buying.
+### The Math
 
-*   **Party A (Room Creator) sets the FLOOR.**
-    *   This is the **Seller's minimum**. They are saying: *"I will absolutely not accept anything less than X."*
-*   **Party B (Receiver) sets the CEILING.**
-    *   This is the **Buyer's maximum**. They are saying: *"I will absolutely not pay a single penny more than Y."*
+**1-on-1:** A deal happens if `Ceiling >= Floor`. Agreed price = `(Floor + Ceiling) / 2`.
 
-**The Rule:** A deal ONLY happens if the Buyer's Ceiling is greater than or equal to the Seller's Floor (`Ceiling >= Floor`).
-
-#### Scenario 1: NO DEAL (e.g., 80M vs 20M)
-*   **Seller (Floor):** 80M
-*   **Buyer (Ceiling):** 20M
-*   **Math:** Does 20M >= 80M? **No.**
-*   **Outcome:** "No Overlap". The UI decrypts the result as a false match. The Escrow contract fully refunds the Buyer. Neither party learns the other's number.
-
-#### Scenario 2: DEAL FOUND (e.g., 80M vs 95M)
-*   **Seller (Floor):** 80M
-*   **Buyer (Ceiling):** 95M
-*   **Math:** Does 95M >= 80M? **Yes!**
-*   **Outcome:** "Prices Compared". The contract mathematically computes the exact midpoint: `(80M + 95M) / 2 = 87.5M`. The agreed settlement price becomes **87.5M**. The Escrow contract trustlessly transfers 87.5M to the Seller and refunds the 7.5M remainder to the Buyer.
+**Auction:** The FHE tournament finds the highest bid where `Bid >= Floor`. Agreed price = `(Floor + BestBid) / 2`.
 
 ### Privacy Guarantee
 
 Neither party learns the other's reservation price under any outcome:
 
-- **No deal:** Each party learns only that no overlap exists.
-- **Deal:** Each party learns the agreed midpoint. Individual prices remain encrypted forever.
+- **No deal / no qualifying bid:** Each party learns only that no overlap exists.
+- **Deal / winner found:** Parties learn the agreed midpoint. Individual prices remain encrypted forever.
 
 This property is enforced cryptographically — not by policy or trust.
 
@@ -211,18 +271,7 @@ This property is enforced cryptographically — not by policy or trust.
 |---|---|
 | pnpm workspaces | Monorepo management |
 | Foundry | Contract compilation and deployment |
-| LocalStorage | Room state persistence + on-chain state |
-
----
-
-## Supported Negotiation Types
-
-| Type | Initiator (Party A) | Counterparty (Party B) | Unit |
-|---|---|---|---|
-| M&A Deal | Minimum Acceptable Price | Maximum Willing to Pay | M (millions) |
-| Salary | Minimum Acceptable Salary | Maximum Offer | K (thousands) |
-| Real Estate | Minimum Sale Price | Maximum Purchase Price | M (millions) |
-| Custom Deal | Minimum Acceptable | Maximum Willing to Pay | — |
+| LocalStorage | Room / auction state persistence + on-chain state |
 
 ---
 
@@ -231,14 +280,29 @@ This property is enforced cryptographically — not by policy or trust.
 | Route | Description |
 |---|---|
 | `/` | Landing page — protocol overview |
-| `/role` | Role selection — Initiator or Counterparty |
-| `/create` | Initiator flow — set floor price, encrypt, create room |
-| `/join` | Counterparty flow — enter room code |
+| `/role` | Role selection — Negotiation, Join Room, or Sealed-Bid Auction |
+| `/create` | 1-on-1: Set floor price, encrypt, create room |
+| `/join` | 1-on-1: Enter room code |
+| `/room/:id` | 1-on-1: Negotiation room — price submission and FHE computation |
+| `/result/:id` | 1-on-1: Deal outcome, escrow settlement |
+| `/auction/create` | Multi-party: Create sealed-bid auction, set floor, invite bidders |
+| `/auction/:id` | Multi-party: Live bidding room with countdown and bid progress |
+| `/auction/result/:id` | Multi-party: Winner reveal, decrypt & publish |
 | `/inbox` | On-chain inbox — received and sent invites |
-| `/room/:id` | Negotiation room — price submission and FHE computation |
-| `/result/:id` | Result page — deal outcome, escrow settlement |
-| `/deposit/:id` | Wave 4 — lock USDC escrow before negotiation |
+| `/deposit/:id` | Lock USDC escrow before negotiation |
 | `/negotiate` | Interactive demo — protocol demonstration |
+| `/profile` | User profile and negotiation history |
+
+---
+
+## Deployed Contracts (Base Sepolia)
+
+| Contract | Address |
+|---|---|
+| `BlindNegotiation` | [`0xd7FA8ad77cfAa55674af496088f8D3723F9ff402`](https://sepolia.basescan.org/address/0xd7FA8ad77cfAa55674af496088f8D3723F9ff402) |
+| `MultiPartyAuction` | [`0xE3cfEDb40575412574d1107730ade283237Ab1df`](https://sepolia.basescan.org/address/0xE3cfEDb40575412574d1107730ade283237Ab1df) |
+| `ConfidentialEscrow` | [`0x4B5c130ad2BD8A9CDfa062E2B9d7a655Db757F3A`](https://sepolia.basescan.org/address/0x4B5c130ad2BD8A9CDfa062E2B9d7a655Db757F3A) |
+| `USDC` (Base Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
 ---
 
@@ -270,17 +334,9 @@ The application runs at `http://localhost:5173`.
 
 ## Wave 4: Confidential Escrow & Auto-Settlement
 
-Wave 4 adds the financial execution layer to Concord. Instead of stopping at price discovery, the protocol now handles end-to-end trustless settlement using on-chain USDC escrow.
+Wave 4 adds the financial execution layer. Instead of stopping at price discovery, the protocol handles end-to-end trustless settlement using on-chain USDC escrow.
 
-### Deployed Contracts (Base Sepolia)
-
-| Contract | Address |
-|---|---|
-| `BlindNegotiation` | [`0xEB81D05a54068A662aD7aC62CF1Df91cD5e9DdE6`](https://sepolia.basescan.org/address/0xEB81D05a54068A662aD7aC62CF1Df91cD5e9DdE6) |
-| `ConfidentialEscrow` | [`0x4B5c130ad2BD8A9CDfa062E2B9d7a655Db757F3A`](https://sepolia.basescan.org/address/0x4B5c130ad2BD8A9CDfa062E2B9d7a655Db757F3A) |
-| `USDC` (Base Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
-
-### Wave 4 Settlement Flow
+### Settlement Flow
 
 ```
 1. Buyer deposits max capital (USDC) into ConfidentialEscrow before negotiation
@@ -300,12 +356,42 @@ Wave 4 adds the financial execution layer to Concord. Instead of stopping at pri
 
 ---
 
+## Wave 5: Multi-Party Sealed-Bid Auctions & Industry Dashboards
+
+Wave 5 expands Concord from a 1-on-1 negotiation platform into a multi-party encrypted bidding engine.
+
+### What Was Added
+
+1. **MultiPartyAuction.sol** — New contract supporting 2-10 bidders per auction with FHE tournament bracket logic
+2. **3 New Pages** — CreateAuction, AuctionRoom, AuctionResult
+3. **Industry Dashboards** — M&A, Salary, Real Estate, Custom deal types with specialized metadata fields
+4. **Updated Navigation** — Sealed-Bid Auction option on role selection, Auctions link in navbar
+
+### FHE Tournament Bracket
+
+The `computeAuction()` function iterates through all bids and performs pairwise FHE comparisons:
+
+```
+For each bid:
+  1. isEligible = FHE.gte(bid, floor)          // Does this bid meet the floor?
+  2. isBetter = FHE.gte(bid, currentBest)      // Is this bid higher than the current best?
+  3. shouldReplace = FHE.and(eligible, better)  // Both conditions must be true
+  4. currentBest = FHE.select(replace, bid, currentBest)
+
+Final: agreedPrice = FHE.div(FHE.add(floor, bestBid), 2)
+```
+
+All operations run on encrypted ciphertext. No bid value, rank, or eligibility status is ever revealed during computation.
+
+---
+
 ## Security Properties
 
 - **Input Privacy:** Prices encrypted on-device before any network transmission
 - **Computation Integrity:** All arithmetic runs inside Fhenix CoFHE — no trusted intermediary
 - **Zero-Knowledge No-Deal:** When no overlap exists, neither party learns any bound
 - **Partial Revelation on Deal:** Only the midpoint is revealed; individual prices remain encrypted
+- **Auction Secrecy:** No bidder learns any other bidder's price, rank, or eligibility
 - **Trustless Settlement:** ConfidentialEscrow enforces payment based on cryptographic proof, not human trust
 
 ---
