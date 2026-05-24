@@ -705,6 +705,21 @@ export const MULTI_PARTY_AUCTION_ABI = [
     ],
     stateMutability: "view",
   },
+  // getSentInvites
+  {
+    type: "function",
+    name: "getSentInvites",
+    inputs: [{ name: "sender", type: "address" }],
+    outputs: [
+      { name: "", type: "tuple[]", components: [
+        { name: "auctionId", type: "bytes32" },
+        { name: "sender", type: "address" },
+        { name: "timestamp", type: "uint256" },
+        { name: "negotiationType", type: "uint8" },
+      ]},
+    ],
+    stateMutability: "view",
+  },
   // Events
   {
     type: "event",

@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Check, Copy, Wallet, ShieldCheck, ArrowRight, Send, Calendar, ChevronDown, Activity, Zap, Users, Gavel } from "lucide-react";
+import { Lock, Check, Copy, Wallet, ShieldCheck, ArrowRight, Send, Calendar, Activity, Zap, Users, Gavel, Clipboard } from "lucide-react";
 import { useAccount, useDisconnect, usePublicClient, useWalletClient } from "wagmi";
 import { useModal } from "connectkit";
 import NavBar from "@/components/NavBar";
 import FHEBadge from "@/components/FHEBadge";
-import { NEGOTIATION_TYPES, saveAuction, type NegotiationType, type PriceUnit, type Auction } from "@/lib/concord";
-import { encryptPrice, initFHE, type FHEStatus, type EncryptProgress } from "@/lib/fhe";
-import { MULTI_PARTY_AUCTION_ABI, MULTI_PARTY_AUCTION_ADDRESS, generateRoomIdBytes32, roomIdToCode, getExplorerTxUrl } from "@/lib/contracts";
+import { NEGOTIATION_TYPES, saveAuction, type NegotiationType, type PriceUnit } from "@/lib/concord";
+import { encryptPrice, initFHE, type FHEStatus } from "@/lib/fhe";
+import { MULTI_PARTY_AUCTION_ABI, MULTI_PARTY_AUCTION_ADDRESS, generateRoomIdBytes32, roomIdToCode } from "@/lib/contracts";
 
 const LABEL_STYLE = {
   fontSize: 10, fontWeight: 700, color: "hsl(var(--foreground))", opacity: 0.75,
@@ -40,20 +40,47 @@ export default function CreateAuction() {
   const [codeCopied, setCodeCopied] = useState(false);
   const [metadata, setMetadata] = useState<Record<string, string>>({});
 
-  // Invite state
-  const [recipientInput, setRecipientInput] = useState("");
-  const [inviteState, setInviteState] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [inviteError, setInviteError] = useState("");
-  const [invitedAddresses, setInvitedAddresses] = useState<string[]>([]);
+  // ── Batch bidder address inputs ───────────────────────────────
+  const [bidderAddresses, setBidderAddresses] = useState<string[]>(Array(5).fill(""));
+  const [invitedCount, setInvitedCount] = useState(0);
 
   const meta = NEGOTIATION_TYPES[type];
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
 
+  // Resize bidder address array when maxBidders changes
+  useEffect(() => {
+    setBidderAddresses(prev => {
+      const next = Array(maxBidders).fill("");
+      for (let i = 0; i < Math.min(prev.length, maxBidders); i++) {
+        next[i] = prev[i];
+      }
+      return next;
+    });
+  }, [maxBidders]);
+
   const toggleTerm = (t: string) => {
     setSelectedTerms(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
   };
 
+  const handleAddressChange = (index: number, value: string) => {
+    setBidderAddresses(prev => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  };
+
+  const handlePaste = async (index: number) => {
+    try {
+      const text = await navigator.clipboard.readText();
+      handleAddressChange(index, text.trim());
+    } catch (e) {
+      // Clipboard access denied — ignore
+    }
+  };
+
+  // ── Submit: create auction + send all invites ─────────────────
   const handleSubmit = async () => {
     if (!price || !walletConnected || !publicClient || !walletClient) return;
     const parsedPrice = parseFloat(price);
@@ -89,7 +116,7 @@ export default function CreateAuction() {
         ? BigInt(Math.floor(new Date(deadline).getTime() / 1000))
         : BigInt(Math.floor(Date.now() / 1000) + 7 * 24 * 3600);
 
-      setEncryptStep("Submitting to blockchain…");
+      setEncryptStep("Submitting auction to blockchain…");
       const hash = await walletClient.writeContract({
         address: MULTI_PARTY_AUCTION_ADDRESS,
         abi: MULTI_PARTY_AUCTION_ABI,
@@ -120,10 +147,39 @@ export default function CreateAuction() {
         txHash: hash,
       });
 
-      setEncStatus("done");
-      setEncryptStep("Confirming on-chain…");
+      setEncryptStep("Confirming auction on-chain…");
       await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
       setAuctionConfirmed(true);
+
+      // ── Automatically send invites to all valid addresses ──────
+      const validAddresses = bidderAddresses
+        .map(a => a.trim())
+        .filter(a => a.startsWith("0x") && a.length === 42);
+
+      if (validAddresses.length > 0) {
+        let sentCount = 0;
+        for (let i = 0; i < validAddresses.length; i++) {
+          try {
+            setEncryptStep(`Sending invite ${i + 1} of ${validAddresses.length}…`);
+            const invHash = await walletClient.writeContract({
+              address: MULTI_PARTY_AUCTION_ADDRESS,
+              abi: MULTI_PARTY_AUCTION_ABI,
+              functionName: "sendInvite",
+              args: [auctionIdHex as `0x${string}`, validAddresses[i] as `0x${string}`],
+              chain: walletClient.chain,
+              account: walletClient.account,
+            });
+            await publicClient.waitForTransactionReceipt({ hash: invHash, confirmations: 1 });
+            sentCount++;
+          } catch (err: any) {
+            console.error(`[CreateAuction] Invite ${i + 1} failed:`, err);
+            // Continue with remaining invites
+          }
+        }
+        setInvitedCount(sentCount);
+      }
+
+      setEncStatus("done");
       setEncryptStep("");
     } catch (error: any) {
       console.error("[CreateAuction] Error:", error);
@@ -137,37 +193,10 @@ export default function CreateAuction() {
     }
   };
 
-  const sendInviteOnChain = async () => {
-    if (!recipientInput.trim() || !walletClient || !publicClient || !auctionId) return;
-    const recipient = recipientInput.trim();
-    if (!recipient.startsWith("0x") || recipient.length !== 42) {
-      setInviteError("Enter a valid wallet address (0x…, 42 chars)");
-      return;
-    }
-    setInviteState("sending");
-    setInviteError("");
-    try {
-      const hash = await walletClient.writeContract({
-        address: MULTI_PARTY_AUCTION_ADDRESS,
-        abi: MULTI_PARTY_AUCTION_ABI,
-        functionName: "sendInvite",
-        args: [auctionId as `0x${string}`, recipient as `0x${string}`],
-        chain: walletClient.chain,
-        account: walletClient.account,
-      });
-      await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
-      setInviteState("sent");
-      setInvitedAddresses(prev => [...prev, recipient]);
-      setRecipientInput("");
-      setTimeout(() => setInviteState("idle"), 2000);
-    } catch (err: any) {
-      setInviteError(err?.shortMessage ?? "Transaction failed");
-      setInviteState("error");
-    }
-  };
-
   // ── Pre-submit form ───────────────────────────────────────────
   if (encStatus === "idle") {
+    const validCount = bidderAddresses.filter(a => a.trim().startsWith("0x") && a.trim().length === 42).length;
+
     return (
       <div className="min-h-screen bg-background">
         <NavBar />
@@ -262,6 +291,80 @@ export default function CreateAuction() {
               <div className="flex justify-between text-[10px] text-foreground/30 mt-1"><span>2</span><span>10</span></div>
             </div>
 
+            {/* ── Bidder Wallet Address Inputs ───────────────────── */}
+            <div style={LABEL_STYLE}><Send className="w-3.5 h-3.5" /> Invite Bidders ({maxBidders} slots)</div>
+            <div className="apple-card p-4 mb-6">
+              <p className="text-[11px] text-foreground/30 mb-3 leading-relaxed">
+                Paste each bidder's wallet address below. All invites will be sent on-chain automatically when you create the auction.
+              </p>
+              <div className="space-y-2.5">
+                {bidderAddresses.map((addr, i) => {
+                  const isValid = addr.trim().startsWith("0x") && addr.trim().length === 42;
+                  const isEmpty = !addr.trim();
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      {/* Number badge */}
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold transition-all duration-300"
+                        style={{
+                          background: isValid ? "rgba(48,209,88,0.12)" : "rgba(255,149,0,0.08)",
+                          color: isValid ? "#30d158" : isEmpty ? "hsl(var(--foreground) / 0.25)" : "#ff9500",
+                          border: isValid ? "1px solid rgba(48,209,88,0.3)" : "1px solid rgba(255,149,0,0.12)",
+                        }}
+                      >
+                        {isValid ? <Check className="w-3 h-3" /> : i + 1}
+                      </div>
+
+                      {/* Address input */}
+                      <input
+                        value={addr}
+                        onChange={e => handleAddressChange(i, e.target.value)}
+                        placeholder={`Bidder ${i + 1} wallet (0x…)`}
+                        spellCheck={false}
+                        className="flex-1 text-[12px] text-foreground font-mono outline-none placeholder:text-foreground/15 px-3 py-2.5 rounded-xl transition-all duration-200"
+                        style={{
+                          background: "var(--subtle-bg)",
+                          border: isValid
+                            ? "1px solid rgba(48,209,88,0.3)"
+                            : addr.trim() && !isValid
+                            ? "1px solid rgba(255,59,48,0.3)"
+                            : "1px solid var(--card-border-color)",
+                        }}
+                      />
+
+                      {/* Paste button */}
+                      <button
+                        onClick={() => handlePaste(i)}
+                        className="px-3 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all hover:brightness-125 shrink-0"
+                        style={{
+                          background: "rgba(10,132,255,0.08)",
+                          border: "1px solid rgba(10,132,255,0.2)",
+                          color: "#0a84ff",
+                        }}
+                      >
+                        <Clipboard className="w-3 h-3" />
+                        Paste
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Valid count indicator */}
+              <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--card-border-color)" }}>
+                {validCount > 0 ? (
+                  <span className="text-[11px] text-[#30d158]/70 flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    {validCount} valid address{validCount !== 1 ? "es" : ""} — will receive on-chain invites
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-foreground/20">
+                    No addresses entered yet — you can also invite bidders later
+                  </span>
+                )}
+              </div>
+            </div>
+
             {/* Terms */}
             <div style={LABEL_STYLE}>Deal Terms</div>
             <div className="flex flex-wrap gap-2 mb-4">
@@ -286,7 +389,10 @@ export default function CreateAuction() {
             ) : (
               <button onClick={handleSubmit} disabled={!price || parseFloat(price) <= 0}
                 className="btn-apple w-full py-3.5 text-[14px] flex items-center justify-center gap-2 disabled:opacity-30">
-                <Lock className="w-4 h-4" /> Encrypt Floor & Create Auction
+                <Lock className="w-4 h-4" />
+                {validCount > 0
+                  ? `Encrypt Floor, Create & Invite ${validCount} Bidder${validCount !== 1 ? "s" : ""}`
+                  : "Encrypt Floor & Create Auction"}
               </button>
             )}
           </motion.div>
@@ -295,22 +401,24 @@ export default function CreateAuction() {
     );
   }
 
-  // ── Encrypting state ──────────────────────────────────────────
+  // ── Encrypting / Creating / Inviting state ────────────────────
   if (encStatus === "encrypting") {
     return (
       <div className="min-h-screen bg-background">
         <NavBar />
         <div className="pt-20 pb-16 px-6 max-w-xl mx-auto flex flex-col items-center justify-center gap-4" style={{ minHeight: "60vh" }}>
           <div className="w-10 h-10 border-3 border-[#ff9500]/30 border-t-[#ff9500] rounded-full animate-spin" />
-          <div className="text-[14px] text-foreground/60 font-medium">{encryptStep || "Encrypting…"}</div>
+          <div className="text-[14px] text-foreground/60 font-medium text-center">{encryptStep || "Encrypting…"}</div>
           <FHEBadge />
         </div>
       </div>
     );
   }
 
-  // ── Auction created — show invite UI ──────────────────────────
+  // ── Auction created — success screen ──────────────────────────
   const displayCode = auctionId ? roomIdToCode(auctionId as `0x${string}`) : "";
+  const finalValidAddrs = bidderAddresses.map(a => a.trim()).filter(a => a.startsWith("0x") && a.length === 42);
+
   return (
     <div className="min-h-screen bg-background">
       <NavBar />
@@ -324,7 +432,11 @@ export default function CreateAuction() {
             </div>
             <div>
               <h2 className="text-[18px] font-bold text-foreground">Auction Created</h2>
-              <p className="text-[12px] text-foreground/40">Your floor price is encrypted on-chain. Invite bidders below.</p>
+              <p className="text-[12px] text-foreground/40">
+                {invitedCount > 0
+                  ? `Floor encrypted on-chain. ${invitedCount} bidder${invitedCount !== 1 ? "s" : ""} invited successfully.`
+                  : "Your floor price is encrypted on-chain."}
+              </p>
             </div>
           </div>
 
@@ -358,29 +470,28 @@ export default function CreateAuction() {
             </div>
           </div>
 
-          {/* Invite section */}
-          <div style={LABEL_STYLE}><Send className="w-3.5 h-3.5" /> Invite Bidders</div>
-          <div className="apple-card p-4 mb-4">
-            <input value={recipientInput} onChange={e => setRecipientInput(e.target.value)}
-              placeholder="Bidder wallet address (0x…)"
-              className="w-full bg-transparent text-[13px] text-foreground outline-none placeholder:text-foreground/20 mb-3" />
-            {inviteError && <div className="text-[11px] text-red-400 mb-2">{inviteError}</div>}
-            <button onClick={sendInviteOnChain} disabled={inviteState === "sending" || !auctionConfirmed}
-              className="btn-apple w-full py-2.5 text-[13px] flex items-center justify-center gap-2 disabled:opacity-30">
-              {inviteState === "sending" ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending…</> :
-               inviteState === "sent" ? <><Check className="w-3.5 h-3.5" /> Sent!</> :
-               <><Send className="w-3.5 h-3.5" /> Send On-Chain Invite</>}
-            </button>
-            {invitedAddresses.length > 0 && (
-              <div className="mt-3 space-y-1">
-                {invitedAddresses.map((addr, i) => (
-                  <div key={i} className="text-[11px] text-[#30d158]/60 flex items-center gap-1">
-                    <Check className="w-2.5 h-2.5" /> {addr.slice(0, 8)}…{addr.slice(-4)}
+          {/* Invited bidders summary */}
+          {invitedCount > 0 && (
+            <div className="apple-card p-4 mb-4">
+              <div className="text-[10px] font-bold text-foreground/50 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Send className="w-3.5 h-3.5" /> Invited Bidders
+              </div>
+              <div className="space-y-2">
+                {finalValidAddrs.slice(0, invitedCount).map((addr, i) => (
+                  <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: "rgba(48,209,88,0.05)", border: "1px solid rgba(48,209,88,0.12)" }}>
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center bg-[rgba(48,209,88,0.15)]">
+                      <Check className="w-2.5 h-2.5 text-[#30d158]" />
+                    </div>
+                    <span className="text-[12px] text-foreground/60 font-mono">{addr.slice(0, 10)}…{addr.slice(-4)}</span>
+                    <span className="text-[10px] text-[#30d158]/50 ml-auto">Invite sent</span>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+              <p className="text-[11px] text-foreground/25 mt-3 leading-relaxed">
+                Bidders will see this auction in their <strong>Inbox</strong> and can submit encrypted bids.
+              </p>
+            </div>
+          )}
 
           {/* Open auction room */}
           <button onClick={() => navigate(`/auction/${auctionId}`)}
@@ -388,7 +499,13 @@ export default function CreateAuction() {
             Open Auction Room <ArrowRight className="w-4 h-4" />
           </button>
 
-          <button onClick={() => { setEncStatus("idle"); setAuctionId(""); setAuctionConfirmed(false); }}
+          <button onClick={() => {
+            setEncStatus("idle");
+            setAuctionId("");
+            setAuctionConfirmed(false);
+            setBidderAddresses(Array(maxBidders).fill(""));
+            setInvitedCount(0);
+          }}
             className="w-full text-center text-[13px] text-foreground/30 hover:text-foreground/50 transition-colors py-2">
             New Auction
           </button>

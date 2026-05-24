@@ -3,15 +3,23 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Inbox, Send, ArrowRight, ShieldCheck, Clock, CheckCheck,
-  RefreshCw, Link2, Lock, Unlock, Copy, Check
+  RefreshCw, Link2, Lock, Unlock, Copy, Check, Gavel
 } from "lucide-react";
 import NavBar from "@/components/NavBar";
 import { useAccount, useReadContract } from "wagmi";
-import { BLIND_NEGOTIATION_ABI, BLIND_NEGOTIATION_ADDRESS, roomIdToCode } from "@/lib/contracts";
+import { BLIND_NEGOTIATION_ABI, BLIND_NEGOTIATION_ADDRESS, MULTI_PARTY_AUCTION_ABI, MULTI_PARTY_AUCTION_ADDRESS, roomIdToCode } from "@/lib/contracts";
 
 // ── Types ──────────────────────────────────────────────────────
 interface OnChainInvite {
   roomId: `0x${string}`;
+  sender: `0x${string}`;
+  timestamp: bigint;
+  negotiationType: number;
+  isAuction?: boolean;
+}
+
+interface AuctionInviteRaw {
+  auctionId: `0x${string}`;
   sender: `0x${string}`;
   timestamp: bigint;
   negotiationType: number;
@@ -35,7 +43,7 @@ function truncAddr(addr: string): string {
 }
 
 // ── Decryptable Invite Card ─────────────────────────────────────
-function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: string, code: string) => void }) {
+function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: string, code: string, isAuction: boolean) => void }) {
   const [decrypted, setDecrypted] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -60,7 +68,7 @@ function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: stri
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       className="apple-card p-5"
-      style={{ borderColor: decrypted ? "rgba(48,209,88,0.3)" : "rgba(120,80,255,0.25)" }}
+      style={{ borderColor: decrypted ? "rgba(48,209,88,0.3)" : inv.isAuction ? "rgba(255,149,0,0.25)" : "rgba(120,80,255,0.25)" }}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -68,19 +76,24 @@ function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: stri
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-500"
             style={{
-              background: decrypted ? "rgba(48,209,88,0.12)" : "rgba(120,80,255,0.12)",
-              border: decrypted ? "1px solid rgba(48,209,88,0.25)" : "1px solid rgba(120,80,255,0.2)"
+              background: decrypted ? "rgba(48,209,88,0.12)" : inv.isAuction ? "rgba(255,149,0,0.12)" : "rgba(120,80,255,0.12)",
+              border: decrypted ? "1px solid rgba(48,209,88,0.25)" : inv.isAuction ? "1px solid rgba(255,149,0,0.2)" : "1px solid rgba(120,80,255,0.2)"
             }}
           >
             {decrypted
               ? <ShieldCheck className="w-4 h-4 text-[#30d158]" />
+              : inv.isAuction
+              ? <Gavel className="w-4 h-4" style={{ color: "#ff9500" }} />
               : <Lock className="w-4 h-4" style={{ color: "#a78bfa" }} />
             }
           </div>
           <div>
             <div className="text-[13px] font-semibold text-foreground">
-              {NEG_TYPE_LABELS[inv.negotiationType] ?? "Negotiation"} Invite
+              {inv.isAuction ? "🔨 Auction" : ""} {NEG_TYPE_LABELS[inv.negotiationType] ?? "Negotiation"} Invite
             </div>
+            {inv.isAuction && (
+              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: "rgba(255,149,0,0.12)", color: "#ff9500" }}>Sealed-Bid</span>
+            )}
             <div className="text-[11px] text-foreground/35 font-mono">from {truncAddr(inv.sender)}</div>
           </div>
         </div>
@@ -193,7 +206,7 @@ function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: stri
             Copy Code
           </button>
           <button
-            onClick={() => onJoin(inv.roomId, code)}
+            onClick={() => onJoin(inv.roomId, code, !!inv.isAuction)}
             className="flex-1 btn-apple py-3 text-[13px] flex items-center justify-center gap-2"
           >
             Join Room
@@ -211,6 +224,7 @@ export default function InboxPage() {
   const [tab, setTab] = useState<"received" | "sent">("received");
   const { address, isConnected } = useAccount();
 
+  // ── Read invites from BlindNegotiation (1-on-1 rooms) ────────
   const {
     data: receivedRaw,
     isLoading: loadingReceived,
@@ -235,23 +249,73 @@ export default function InboxPage() {
     query: { enabled: !!address },
   });
 
-  const received: OnChainInvite[] = ((receivedRaw as OnChainInvite[] | undefined) ?? []).slice().sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
-  const sent: OnChainInvite[] = ((sentRaw as OnChainInvite[] | undefined) ?? []).slice().sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
-  const loading = loadingReceived || loadingSent;
+  // ── Read invites from MultiPartyAuction ──────────────────────
+  const {
+    data: auctionReceivedRaw,
+    isLoading: loadingAuctionReceived,
+    refetch: refetchAuctionReceived,
+  } = useReadContract({
+    address: MULTI_PARTY_AUCTION_ADDRESS,
+    abi: MULTI_PARTY_AUCTION_ABI,
+    functionName: "getReceivedInvites",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const {
+    data: auctionSentRaw,
+    isLoading: loadingAuctionSent,
+    refetch: refetchAuctionSent,
+  } = useReadContract({
+    address: MULTI_PARTY_AUCTION_ADDRESS,
+    abi: MULTI_PARTY_AUCTION_ABI,
+    functionName: "getSentInvites",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  // ── Merge invites from both contracts ─────────────────────────
+  const roomReceived: OnChainInvite[] = ((receivedRaw as OnChainInvite[] | undefined) ?? []).map(inv => ({ ...inv, isAuction: false }));
+  const auctionReceived: OnChainInvite[] = ((auctionReceivedRaw as AuctionInviteRaw[] | undefined) ?? []).map(inv => ({
+    roomId: inv.auctionId,
+    sender: inv.sender,
+    timestamp: inv.timestamp,
+    negotiationType: inv.negotiationType,
+    isAuction: true,
+  }));
+  const received: OnChainInvite[] = [...roomReceived, ...auctionReceived].sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+
+  const roomSent: OnChainInvite[] = ((sentRaw as OnChainInvite[] | undefined) ?? []).map(inv => ({ ...inv, isAuction: false }));
+  const auctionSent: OnChainInvite[] = ((auctionSentRaw as AuctionInviteRaw[] | undefined) ?? []).map(inv => ({
+    roomId: inv.auctionId,
+    sender: inv.sender,
+    timestamp: inv.timestamp,
+    negotiationType: inv.negotiationType,
+    isAuction: true,
+  }));
+  const sent: OnChainInvite[] = [...roomSent, ...auctionSent].sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+
+  const loading = loadingReceived || loadingSent || loadingAuctionReceived || loadingAuctionSent;
 
   const refresh = useCallback(() => {
     refetchReceived();
     refetchSent();
-  }, [refetchReceived, refetchSent]);
+    refetchAuctionReceived();
+    refetchAuctionSent();
+  }, [refetchReceived, refetchSent, refetchAuctionReceived, refetchAuctionSent]);
 
   useEffect(() => {
     const interval = setInterval(refresh, 15000);
     return () => clearInterval(interval);
   }, [refresh]);
 
-  const handleJoin = (roomIdHex: string, _code: string) => {
-    // Navigate directly to the room using the on-chain bytes32 ID
-    navigate(`/room/${roomIdHex}`);
+  const handleJoin = (roomIdHex: string, _code: string, isAuction: boolean = false) => {
+    // Navigate to auction room or regular room based on invite type
+    if (isAuction) {
+      navigate(`/auction/${roomIdHex}`);
+    } else {
+      navigate(`/room/${roomIdHex}`);
+    }
   };
 
   return (
@@ -465,10 +529,10 @@ export default function InboxPage() {
                       </div>
 
                       <button
-                        onClick={() => navigate(`/room/${inv.roomId}`)}
+                        onClick={() => navigate(inv.isAuction ? `/auction/${inv.roomId}` : `/room/${inv.roomId}`)}
                         className="btn-ghost w-full py-3 text-[13px] flex items-center justify-center gap-2"
                       >
-                        Open Your Room
+                        {inv.isAuction ? "Open Auction Room" : "Open Your Room"}
                         <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </motion.div>
