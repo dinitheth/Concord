@@ -43,6 +43,7 @@ export default function CreateAuction() {
   // ── Batch bidder address inputs ───────────────────────────────
   const [bidderAddresses, setBidderAddresses] = useState<string[]>(Array(5).fill(""));
   const [invitedCount, setInvitedCount] = useState(0);
+  const [invitedAddresses, setInvitedAddresses] = useState<string[]>([]);
 
   const meta = NEGOTIATION_TYPES[type];
   const publicClient = usePublicClient();
@@ -191,6 +192,7 @@ export default function CreateAuction() {
           });
           await publicClient.waitForTransactionReceipt({ hash: invHash, confirmations: 1 });
           setInvitedCount(uniqueAddresses.length);
+          setInvitedAddresses(uniqueAddresses);
         } catch (err: any) {
           console.error(`[CreateAuction] Batch invites failed:`, err);
         }
@@ -212,7 +214,12 @@ export default function CreateAuction() {
 
   // ── Pre-submit form ───────────────────────────────────────────
   if (encStatus === "idle") {
-    const validCount = bidderAddresses.filter(a => a.trim().startsWith("0x") && a.trim().length === 42).length;
+    const uniqueAddressesForDisplay = Array.from(new Set(
+      bidderAddresses
+        .map(a => a.trim())
+        .filter(a => a.startsWith("0x") && a.length === 42 && a.toLowerCase() !== walletAddr.toLowerCase())
+    ));
+    const validCount = uniqueAddressesForDisplay.length;
 
     return (
       <div className="min-h-screen bg-background">
@@ -360,50 +367,75 @@ export default function CreateAuction() {
                 {bidderAddresses.map((addr, i) => {
                   const isValid = addr.trim().startsWith("0x") && addr.trim().length === 42;
                   const isEmpty = !addr.trim();
+                  
+                  // Check if it's the seller (self-invite)
+                  const isSelf = addr.trim().toLowerCase() === walletAddr.toLowerCase();
+                  
+                  // Check if duplicate of another field
+                  const isDuplicate = addr.trim() && bidderAddresses.findIndex((a, idx) => a.trim().toLowerCase() === addr.trim().toLowerCase() && idx !== i) !== -1;
+                  
+                  const hasError = isSelf || isDuplicate;
+
                   return (
-                    <div key={i} className="flex items-center gap-2">
-                      {/* Number badge */}
-                      <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold transition-all duration-300"
-                        style={{
-                          background: isValid ? "rgba(48,209,88,0.12)" : "rgba(255,149,0,0.08)",
-                          color: isValid ? "#30d158" : isEmpty ? "hsl(var(--foreground) / 0.25)" : "#ff9500",
-                          border: isValid ? "1px solid rgba(48,209,88,0.3)" : "1px solid rgba(255,149,0,0.12)",
-                        }}
-                      >
-                        {isValid ? <Check className="w-3 h-3" /> : i + 1}
+                    <div key={i} className="flex flex-col gap-1.5 mb-2">
+                      <div className="flex items-center gap-2">
+                        {/* Number badge */}
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold transition-all duration-300"
+                          style={{
+                            background: hasError ? "rgba(255,59,48,0.12)" : isValid ? "rgba(48,209,88,0.12)" : "rgba(255,149,0,0.08)",
+                            color: hasError ? "#ff3b30" : isValid ? "#30d158" : isEmpty ? "hsl(var(--foreground) / 0.25)" : "#ff9500",
+                            border: hasError ? "1px solid rgba(255,59,48,0.3)" : isValid ? "1px solid rgba(48,209,88,0.3)" : "1px solid rgba(255,149,0,0.12)",
+                          }}
+                        >
+                          {isValid && !hasError ? <Check className="w-3 h-3" /> : i + 1}
+                        </div>
+
+                        {/* Address input */}
+                        <input
+                          value={addr}
+                          onChange={e => handleAddressChange(i, e.target.value)}
+                          placeholder={`Bidder ${i + 1} wallet (0x…)`}
+                          spellCheck={false}
+                          className="flex-1 text-[12px] text-foreground font-mono outline-none placeholder:text-foreground/15 px-3 py-2.5 rounded-xl transition-all duration-200"
+                          style={{
+                            background: "var(--subtle-bg)",
+                            border: hasError
+                              ? "1px solid rgba(255,59,48,0.4)"
+                              : isValid
+                              ? "1px solid rgba(48,209,88,0.3)"
+                              : addr.trim() && !isValid
+                              ? "1px solid rgba(255,59,48,0.3)"
+                              : "1px solid var(--card-border-color)",
+                          }}
+                        />
+
+                        {/* Paste button */}
+                        <button
+                          onClick={() => handlePaste(i)}
+                          className="px-3 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all hover:brightness-125 shrink-0"
+                          style={{
+                            background: "rgba(10,132,255,0.08)",
+                            border: "1px solid rgba(10,132,255,0.2)",
+                            color: "#0a84ff",
+                          }}
+                        >
+                          <Clipboard className="w-3 h-3" />
+                          Paste
+                        </button>
                       </div>
 
-                      {/* Address input */}
-                      <input
-                        value={addr}
-                        onChange={e => handleAddressChange(i, e.target.value)}
-                        placeholder={`Bidder ${i + 1} wallet (0x…)`}
-                        spellCheck={false}
-                        className="flex-1 text-[12px] text-foreground font-mono outline-none placeholder:text-foreground/15 px-3 py-2.5 rounded-xl transition-all duration-200"
-                        style={{
-                          background: "var(--subtle-bg)",
-                          border: isValid
-                            ? "1px solid rgba(48,209,88,0.3)"
-                            : addr.trim() && !isValid
-                            ? "1px solid rgba(255,59,48,0.3)"
-                            : "1px solid var(--card-border-color)",
-                        }}
-                      />
-
-                      {/* Paste button */}
-                      <button
-                        onClick={() => handlePaste(i)}
-                        className="px-3 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all hover:brightness-125 shrink-0"
-                        style={{
-                          background: "rgba(10,132,255,0.08)",
-                          border: "1px solid rgba(10,132,255,0.2)",
-                          color: "#0a84ff",
-                        }}
-                      >
-                        <Clipboard className="w-3 h-3" />
-                        Paste
-                      </button>
+                      {/* Warnings */}
+                      {addr.trim() && isSelf && (
+                        <div className="text-[10px] text-[#ff3b30] ml-9 font-medium">
+                          You cannot invite your own connected address as a bidder.
+                        </div>
+                      )}
+                      {addr.trim() && isDuplicate && (
+                        <div className="text-[10px] text-[#ff3b30] ml-9 font-medium">
+                          Duplicate bidder address.
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -530,13 +562,13 @@ export default function CreateAuction() {
           </div>
 
           {/* Invited bidders summary */}
-          {invitedCount > 0 && (
+          {invitedAddresses.length > 0 && (
             <div className="apple-card p-4 mb-4">
               <div className="text-[10px] font-bold text-foreground/50 uppercase tracking-wider mb-3 flex items-center gap-2">
                 <Send className="w-3.5 h-3.5" /> Invited Bidders
               </div>
               <div className="space-y-2">
-                {finalValidAddrs.slice(0, invitedCount).map((addr, i) => (
+                {invitedAddresses.map((addr, i) => (
                   <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: "rgba(48,209,88,0.05)", border: "1px solid rgba(48,209,88,0.12)" }}>
                     <div className="w-5 h-5 rounded-full flex items-center justify-center bg-[rgba(48,209,88,0.15)]">
                       <Check className="w-2.5 h-2.5 text-[#30d158]" />
