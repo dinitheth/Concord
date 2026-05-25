@@ -31,10 +31,11 @@ contract MultiPartyAuction {
         uint8 negotiationType;       // 0=M&A, 1=Salary, 2=RealEstate, 3=Custom
         uint256 createdAt;
         uint256 deadline;
-        uint8 maxBidders;            // Cap: 2–10
+        uint8 maxBidders;            // Cap: 1–10
         AuctionStatus status;
         ebool hasWinner;             // FHE result: did any bid qualify?
         euint64 agreedPrice;         // FHE midpoint with the best bid
+        euint32 encWinnerIndex;      // Encrypted index of winning bid
         uint8 winnerIndex;           // Index of winning bid (set after publish)
     }
 
@@ -110,7 +111,7 @@ contract MultiPartyAuction {
         require(!auctionExists[auctionId], "Auction already exists");
         require(deadline > block.timestamp, "Deadline must be in the future");
         require(nType <= 3, "Invalid negotiation type");
-        require(maxBidders >= 2 && maxBidders <= 10, "Max bidders must be 2-10");
+        require(maxBidders >= 1 && maxBidders <= 10, "Max bidders must be 1-10");
 
         Auction storage auction = auctions[auctionId];
         auction.seller = msg.sender;
@@ -203,6 +204,7 @@ contract MultiPartyAuction {
         // Start with bid[0] as the candidate
         euint64 bestBid = auctionBids[0].ceilingPrice;
         ebool bestIsEligible = FHE.gte(auctionBids[0].ceilingPrice, auction.floorPrice);
+        euint32 bestIndex = FHE.asEuint32(0);
 
         // Tournament: compare each subsequent bid
         for (uint256 i = 1; i < numBids; i++) {
@@ -220,6 +222,7 @@ contract MultiPartyAuction {
 
             // Update the running best
             bestBid = FHE.select(shouldReplace, auctionBids[i].ceilingPrice, bestBid);
+            bestIndex = FHE.select(shouldReplace, FHE.asEuint32(uint32(i)), bestIndex);
             bestIsEligible = FHE.or(bestIsEligible, thisEligible);
         }
 
@@ -233,6 +236,7 @@ contract MultiPartyAuction {
         // Store results
         auction.hasWinner = bestIsEligible;
         auction.agreedPrice = encAgreed;
+        auction.encWinnerIndex = bestIndex;
         auction.status = AuctionStatus.Settled;
 
         // Grant decryption access to seller + all bidders
@@ -240,10 +244,13 @@ contract MultiPartyAuction {
         FHE.allowThis(auction.hasWinner);
         FHE.allow(auction.agreedPrice, auction.seller);
         FHE.allowThis(auction.agreedPrice);
+        FHE.allow(auction.encWinnerIndex, auction.seller);
+        FHE.allowThis(auction.encWinnerIndex);
 
         for (uint256 i = 0; i < numBids; i++) {
             FHE.allow(auction.hasWinner, auctionBids[i].bidder);
             FHE.allow(auction.agreedPrice, auctionBids[i].bidder);
+            FHE.allow(auction.encWinnerIndex, auctionBids[i].bidder);
         }
 
         emit AuctionComputed(auctionId, uint8(numBids), block.timestamp);
@@ -365,11 +372,12 @@ contract MultiPartyAuction {
 
     function getEncryptedResult(bytes32 auctionId) external view onlyParticipant(auctionId) returns (
         euint64 encAgreedPrice,
-        ebool encHasWinner
+        ebool encHasWinner,
+        euint32 encWinnerIndex
     ) {
         Auction storage a = auctions[auctionId];
         require(a.status == AuctionStatus.Settled, "Not settled");
-        return (a.agreedPrice, a.hasWinner);
+        return (a.agreedPrice, a.hasWinner, a.encWinnerIndex);
     }
 
     function getPublishedResult(bytes32 auctionId) external view returns (

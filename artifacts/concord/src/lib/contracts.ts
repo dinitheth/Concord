@@ -549,7 +549,7 @@ export function mapOnChainStatus(status: number): "open" | "pending_b" | "comput
 
 // ── Wave 5: Multi-Party Auction ─────────────────────────────────
 
-export const MULTI_PARTY_AUCTION_ADDRESS: Address = "0x9681F330E8729C8B4937552783A11De2a8604DD6";
+export const MULTI_PARTY_AUCTION_ADDRESS: Address = "0xe0A48263eeEa990Dd73CE9477Ef776f5D29a4c60";
 
 export const MULTI_PARTY_AUCTION_ABI = [
   // createAuction
@@ -655,6 +655,7 @@ export const MULTI_PARTY_AUCTION_ABI = [
     outputs: [
       { name: "encAgreedPrice", type: "bytes32" },
       { name: "encHasWinner", type: "bytes32" },
+      { name: "encWinnerIndex", type: "bytes32" },
     ],
     stateMutability: "view",
   },

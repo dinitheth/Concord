@@ -35,7 +35,7 @@ Party B: enters ceiling price → encrypted in browser via CoFHE SDK
 
 ### 2. Sealed-Bid Auction (Multi-Party) — Wave 5
 
-A seller sets an encrypted floor price. Multiple bidders (2-10) submit encrypted ceilings. The contract runs an **FHE tournament bracket** to find the highest qualifying bid.
+A seller sets an encrypted floor price. Multiple bidders (1-10) submit encrypted ceilings. The contract runs an **FHE tournament bracket** to find the highest qualifying bid.
 
 ```
 Seller: encrypts floor price → euint64 on-chain
@@ -161,7 +161,7 @@ contract BlindNegotiation {
 ### MultiPartyAuction.sol (Sealed-Bid) — Wave 5
 
 **Network:** Base Sepolia  
-**Address:** `0xE3cfEDb40575412574d1107730ade283237Ab1df`
+**Address:** `0xe0A48263eeEa990Dd73CE9477Ef776f5D29a4c60`
 
 ```solidity
 contract MultiPartyAuction {
@@ -224,7 +224,7 @@ Each negotiation or auction can be tagged with industry metadata. The encrypted 
 
 **Multi-Party Auction:**
 - **Seller:** Sets an encrypted floor price and max bidder count.
-- **Bidders (2-10):** Each submits an encrypted ceiling price.
+- **Bidders (1-10):** Each submits an encrypted ceiling price.
 
 ### The Math
 
@@ -300,7 +300,7 @@ This property is enforced cryptographically — not by policy or trust.
 | Contract | Address |
 |---|---|
 | `BlindNegotiation` | [`0xd7FA8ad77cfAa55674af496088f8D3723F9ff402`](https://sepolia.basescan.org/address/0xd7FA8ad77cfAa55674af496088f8D3723F9ff402) |
-| `MultiPartyAuction` | [`0xE3cfEDb40575412574d1107730ade283237Ab1df`](https://sepolia.basescan.org/address/0xE3cfEDb40575412574d1107730ade283237Ab1df) |
+| `MultiPartyAuction` | [`0xe0A48263eeEa990Dd73CE9477Ef776f5D29a4c60`](https://sepolia.basescan.org/address/0xe0A48263eeEa990Dd73CE9477Ef776f5D29a4c60) |
 | `ConfidentialEscrow` | [`0x4B5c130ad2BD8A9CDfa062E2B9d7a655Db757F3A`](https://sepolia.basescan.org/address/0x4B5c130ad2BD8A9CDfa062E2B9d7a655Db757F3A) |
 | `USDC` (Base Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
@@ -362,7 +362,7 @@ Wave 5 expands Concord from a 1-on-1 negotiation platform into a multi-party enc
 
 ### What Was Added
 
-1. **MultiPartyAuction.sol** — New contract supporting 2-10 bidders per auction with FHE tournament bracket logic
+1. **MultiPartyAuction.sol** — New contract supporting 1-10 bidders per auction with FHE tournament bracket logic, tracking and decrypting the winning bidder index in ciphertext.
 2. **3 New Pages** — CreateAuction, AuctionRoom, AuctionResult
 3. **Industry Dashboards** — M&A, Salary, Real Estate, Custom deal types with specialized metadata fields
 4. **Updated Navigation** — Sealed-Bid Auction option on role selection, Auctions link in navbar

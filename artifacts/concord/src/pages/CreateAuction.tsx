@@ -352,9 +352,9 @@ export default function CreateAuction() {
                 <span className="text-[13px] text-foreground/60">Bidder slots</span>
                 <span className="text-[18px] font-bold text-[#ff9500]">{maxBidders}</span>
               </div>
-              <input type="range" min={2} max={10} value={maxBidders} onChange={e => setMaxBidders(Number(e.target.value))}
+              <input type="range" min={1} max={10} value={maxBidders} onChange={e => setMaxBidders(Number(e.target.value))}
                 className="w-full accent-[#ff9500]" />
-              <div className="flex justify-between text-[10px] text-foreground/30 mt-1"><span>2</span><span>10</span></div>
+              <div className="flex justify-between text-[10px] text-foreground/30 mt-1"><span>1</span><span>10</span></div>
             </div>
 
             {/* ── Bidder Wallet Address Inputs ───────────────────── */}

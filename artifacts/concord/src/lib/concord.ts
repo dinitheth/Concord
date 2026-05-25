@@ -283,7 +283,7 @@ export function shortAddress(addr: string): string {
 // ── Contract Constants ──────────────────────────────────────────
 
 export const CONCORD_CONTRACT_ADDRESS = "0xEB81D05a54068A662aD7aC62CF1Df91cD5e9DdE6";
-export const CONCORD_AUCTION_ADDRESS = "0x9681F330E8729C8B4937552783A11De2a8604DD6";
+export const CONCORD_AUCTION_ADDRESS = "0xe0A48263eeEa990Dd73CE9477Ef776f5D29a4c60";
 export const CONCORD_NETWORK = "Base Sepolia";
 export const CONCORD_CHAIN_ID = 84532;
 export const CONCORD_EXPLORER = "https://sepolia.basescan.org";

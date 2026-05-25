@@ -328,7 +328,7 @@ export default function AuctionRoom() {
               </div>
               <div className="flex gap-2 mb-4">
                 <input type="number" value={bidPrice} onChange={e => setBidPrice(e.target.value)}
-                  placeholder={meta.placeholder}
+                  placeholder="Enter your bid"
                   className="flex-1 apple-card px-4 py-3 text-[16px] font-semibold text-foreground bg-transparent outline-none placeholder:text-foreground/20" />
                 <div className="apple-card px-3 py-3 text-[13px] text-foreground/50 font-semibold flex items-center">{meta.unit || "USD"}</div>
               </div>

@@ -114,10 +114,10 @@ export default function AuctionResult() {
   const agreedPrice = auction.result?.agreedPrice;
   const winnerAddress = auction.result?.winnerAddress;
   const displayPrice = agreedPrice ? `$${agreedPrice}${meta.unit}` : null;
-  const isParticipant = !!address && (
-    auction.seller?.address?.toLowerCase() === address.toLowerCase() ||
-    auction.bids?.some(b => b.address.toLowerCase() === address.toLowerCase())
-  );
+  const isSeller = !!address && auction.seller?.address?.toLowerCase() === address.toLowerCase();
+  const isWinner = !!address && !!winnerAddress && winnerAddress.toLowerCase() === address.toLowerCase();
+  const isBidder = !!address && auction.bids?.some(b => b.address.toLowerCase() === address.toLowerCase());
+  const isParticipant = isSeller || isBidder;
 
   const handleDecryptAndPublish = async () => {
     if (!publicClient || !walletClient || !address) {
@@ -136,23 +136,38 @@ export default function AuctionResult() {
         args: [id as `0x${string}`],
         account: address,
       });
-      const [ctPrice, ctMatch] = encResult as [`0x${string}`, `0x${string}`];
+      const [ctPrice, ctMatch, ctWinnerIndex] = encResult as [`0x${string}`, `0x${string}`, `0x${string}`];
 
       const matchResult = await decryptForTx(ctMatch);
       const decryptedMatch = Boolean(matchResult.decryptedValue);
       let decryptedPrice = 0;
+      let winnerAddr = "0x0000000000000000000000000000000000000000";
 
       if (decryptedMatch) {
         const priceResult = await decryptForTx(ctPrice);
         decryptedPrice = Number(priceResult.decryptedValue);
+
+        try {
+          const winnerIndexResult = await decryptForTx(ctWinnerIndex);
+          const decryptedWinnerIndex = Number(winnerIndexResult.decryptedValue);
+
+          // Fetch winner address by index
+          winnerAddr = await publicClient.readContract({
+            address: MULTI_PARTY_AUCTION_ADDRESS,
+            abi: MULTI_PARTY_AUCTION_ABI,
+            functionName: "getBidder",
+            args: [id as `0x${string}`, BigInt(decryptedWinnerIndex)],
+          }) as `0x${string}`;
+        } catch (winnerErr) {
+          console.warn("Failed to decrypt winner index or fetch winner address:", winnerErr);
+        }
       }
 
-      // For now publish with 0x0 as winner — the contract stores it
       publishResult({
         address: MULTI_PARTY_AUCTION_ADDRESS,
         abi: MULTI_PARTY_AUCTION_ABI,
         functionName: "publishResult",
-        args: [id as `0x${string}`, decryptedMatch, BigInt(decryptedPrice), "0x0000000000000000000000000000000000000000" as `0x${string}`],
+        args: [id as `0x${string}`, decryptedMatch, BigInt(decryptedPrice), winnerAddr as `0x${string}`],
       });
     } catch (err: any) {
       console.warn("Decrypt failed:", err);
@@ -203,25 +218,75 @@ export default function AuctionResult() {
 
               {/* Match found — winner! */}
               {matched && agreedPrice && !isEncrypted && (
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, ease: "easeOut" }}
-                  className="apple-card p-6 text-center mb-6" style={{ borderColor: "rgba(48,209,88,0.4)", background: "rgba(48,209,88,0.04)" }}>
-                  <div className="relative inline-block mb-4">
-                    <Trophy className="w-14 h-14 text-[#ffd60a] mx-auto" />
-                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3 }}
-                      className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#30d158] flex items-center justify-center">
-                      <CheckCircle2 className="w-4 h-4 text-white" />
+                <>
+                  {/* Seller View */}
+                  {isSeller && (
+                    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, ease: "easeOut" }}
+                      className="apple-card p-6 text-center mb-6" style={{ borderColor: "rgba(48,209,88,0.4)", background: "rgba(48,209,88,0.04)" }}>
+                      <div className="relative inline-block mb-4">
+                        <Trophy className="w-14 h-14 text-[#ffd60a] mx-auto" />
+                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3 }}
+                          className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#30d158] flex items-center justify-center">
+                          <CheckCircle2 className="w-4 h-4 text-white" />
+                        </motion.div>
+                      </div>
+                      <h3 className="text-[20px] font-bold text-[#30d158] mb-2">Winner Found!</h3>
+                      <div className="text-[11px] text-foreground/30 uppercase tracking-wider mb-1">{meta.resultLabel}</div>
+                      <div className="text-[36px] font-black text-foreground mb-3">{displayPrice}</div>
+                      {winnerAddress && (
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[rgba(48,209,88,0.08)] border border-[rgba(48,209,88,0.15)]">
+                          <Trophy className="w-3 h-3 text-[#ffd60a]" />
+                          <span className="text-[11px] text-foreground/50 font-mono">Winner Address: {winnerAddress.slice(0, 8)}…{winnerAddress.slice(-4)}</span>
+                        </div>
+                      )}
                     </motion.div>
-                  </div>
-                  <h3 className="text-[20px] font-bold text-[#30d158] mb-2">Winner Found!</h3>
-                  <div className="text-[11px] text-foreground/30 uppercase tracking-wider mb-1">{meta.resultLabel}</div>
-                  <div className="text-[36px] font-black text-foreground mb-3">{displayPrice}</div>
-                  {winnerAddress && (
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[rgba(48,209,88,0.08)] border border-[rgba(48,209,88,0.15)]">
-                      <Trophy className="w-3 h-3 text-[#ffd60a]" />
-                      <span className="text-[11px] text-foreground/50 font-mono">{winnerAddress.slice(0, 8)}…{winnerAddress.slice(-4)}</span>
-                    </div>
                   )}
-                </motion.div>
+
+                  {/* Winner View */}
+                  {isWinner && (
+                    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, ease: "easeOut" }}
+                      className="apple-card p-6 text-center mb-6" style={{ borderColor: "rgba(48,209,88,0.4)", background: "rgba(48,209,88,0.04)" }}>
+                      <div className="relative inline-block mb-4">
+                        <Trophy className="w-14 h-14 text-[#ffd60a] mx-auto" />
+                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3 }}
+                          className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#30d158] flex items-center justify-center">
+                          <CheckCircle2 className="w-4 h-4 text-white" />
+                        </motion.div>
+                      </div>
+                      <h3 className="text-[20px] font-bold text-[#30d158] mb-2">Congratulations! You Won!</h3>
+                      <div className="text-[11px] text-foreground/30 uppercase tracking-wider mb-1">Final Acquisition Price</div>
+                      <div className="text-[36px] font-black text-foreground mb-3">{displayPrice}</div>
+                      <div className="text-[13px] text-foreground/50 leading-relaxed max-w-sm mx-auto">
+                        Your encrypted bid was the highest eligible bid and met the seller's floor price. You have successfully won the auction!
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Loser View */}
+                  {isBidder && !isWinner && (
+                    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, ease: "easeOut" }}
+                      className="apple-card p-6 text-center mb-6" style={{ borderColor: "rgba(255,149,0,0.3)", background: "rgba(255,149,0,0.02)" }}>
+                      <XCircle className="w-12 h-12 text-[#ff9500] mx-auto mb-3" />
+                      <h3 className="text-[18px] font-bold text-[#ff9500] mb-2">Auction Settled</h3>
+                      <div className="text-[14px] font-semibold text-foreground/80 mb-2">Bid Not Accepted (Did Not Win)</div>
+                      <p className="text-[13px] text-foreground/45 max-w-sm mx-auto leading-relaxed">
+                        Another bidder submitted a higher eligible bid, or your bid did not meet the seller's floor price. Thank you for participating.
+                      </p>
+                    </motion.div>
+                  )}
+
+                  {/* General / Other View */}
+                  {!isSeller && !isBidder && (
+                    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, ease: "easeOut" }}
+                      className="apple-card p-6 text-center mb-6" style={{ borderColor: "hsl(var(--border))" }}>
+                      <Trophy className="w-12 h-12 text-foreground/30 mx-auto mb-3" />
+                      <h3 className="text-[18px] font-bold text-foreground mb-2">Auction Completed</h3>
+                      <p className="text-[13px] text-foreground/40 max-w-sm mx-auto">
+                        This auction has been settled on-chain.
+                      </p>
+                    </motion.div>
+                  )}
+                </>
               )}
 
               {/* No match */}
