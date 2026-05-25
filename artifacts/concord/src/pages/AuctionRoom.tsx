@@ -75,7 +75,16 @@ export default function AuctionRoom() {
       }),
       status: mapAuctionStatus(status),
       maxBidders,
-      bids: local?.bids || Array.from({ length: currentBids }, (_, i) => ({ address: "", timestamp: 0 })),
+      bids: (() => {
+        const merged = [...(local?.bids || [])];
+        if (merged.length > currentBids) {
+          return merged.slice(0, currentBids);
+        }
+        while (merged.length < currentBids) {
+          merged.push({ address: "", timestamp: Date.now() });
+        }
+        return merged;
+      })(),
     };
 
     if (isResultPublished) {
@@ -243,30 +252,39 @@ export default function AuctionRoom() {
               </div>
               <h1 className="text-[22px] font-bold text-foreground">{auction.dealName || "Sealed-Bid Auction"}</h1>
             </div>
-            <div className="text-right">
-              <div className="text-[10px] text-foreground/30 uppercase">Code</div>
-              <div className="text-[14px] font-mono font-bold text-foreground/60">{roomIdToCode(id as `0x${string}`)}</div>
-            </div>
           </div>
 
-          {/* Bid progress */}
-          <div className="apple-card p-5 mb-4">
-            <div className="flex justify-between items-center mb-3">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-[#ff9500]" />
-                <span className="text-[13px] font-semibold text-foreground">Bids Received</span>
+          {/* Bid progress - only for seller */}
+          {isSeller && (
+            <div className="apple-card p-5 mb-4">
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[#ff9500]" />
+                  <span className="text-[13px] font-semibold text-foreground">Bids Received</span>
+                </div>
+                <span className="text-[18px] font-bold text-[#ff9500]">{currentBids}<span className="text-foreground/30">/{maxBid}</span></span>
               </div>
-              <span className="text-[18px] font-bold text-[#ff9500]">{currentBids}<span className="text-foreground/30">/{maxBid}</span></span>
+              <div className="w-full h-2 rounded-full bg-foreground/5 overflow-hidden">
+                <motion.div className="h-full rounded-full" style={{ background: "linear-gradient(90deg, #ff9500, #ff6b00)" }}
+                  initial={{ width: 0 }} animate={{ width: `${(currentBids / maxBid) * 100}%` }} transition={{ duration: 0.8, ease: "easeOut" }} />
+              </div>
+              <div className="flex items-center gap-2 mt-3">
+                <Clock className="w-3 h-3 text-foreground/30" />
+                <span className="text-[12px] text-foreground/40">{timeDisplay}</span>
+              </div>
             </div>
-            <div className="w-full h-2 rounded-full bg-foreground/5 overflow-hidden">
-              <motion.div className="h-full rounded-full" style={{ background: "linear-gradient(90deg, #ff9500, #ff6b00)" }}
-                initial={{ width: 0 }} animate={{ width: `${(currentBids / maxBid) * 100}%` }} transition={{ duration: 0.8, ease: "easeOut" }} />
+          )}
+
+          {/* Time Remaining - only for bidder */}
+          {!isSeller && (
+            <div className="apple-card p-4 mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[#ff9500]" />
+                <span className="text-[13px] font-semibold text-foreground">Time Remaining</span>
+              </div>
+              <span className="text-[13px] font-bold text-[#ff9500]">{timeDisplay}</span>
             </div>
-            <div className="flex items-center gap-2 mt-3">
-              <Clock className="w-3 h-3 text-foreground/30" />
-              <span className="text-[12px] text-foreground/40">{timeDisplay}</span>
-            </div>
-          </div>
+          )}
 
           {/* Seller's floor */}
           <div className="apple-card p-4 mb-4">
