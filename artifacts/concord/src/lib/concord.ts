@@ -74,8 +74,9 @@ export interface IndustryField {
   key: string;
   label: string;
   placeholder: string;
-  type: "text" | "number" | "select";
+  type: "text" | "number" | "select" | "currency";
   options?: string[];
+  units?: string[];
 }
 
 export const NEGOTIATION_TYPES: Record<NegotiationType, {
@@ -112,7 +113,7 @@ export const NEGOTIATION_TYPES: Record<NegotiationType, {
     resultLabel: "Acquisition Price",
     dashboardFields: [
       { key: "companyName", label: "Company Name", placeholder: "e.g. Acme Corp", type: "text" },
-      { key: "arr", label: "Annual Recurring Revenue", placeholder: "e.g. $4M", type: "text" },
+      { key: "arr", label: "Annual Recurring Revenue", placeholder: "e.g. 4.2", type: "currency", units: ["USD", "K", "M", "B"] },
       { key: "employees", label: "Employee Count", placeholder: "e.g. 40", type: "number" },
       { key: "stage", label: "Funding Stage", placeholder: "Select stage", type: "select", options: ["Pre-Seed", "Seed", "Series A", "Series B", "Series C+", "Public", "Bootstrapped"] },
     ],
@@ -282,7 +283,7 @@ export function shortAddress(addr: string): string {
 // ── Contract Constants ──────────────────────────────────────────
 
 export const CONCORD_CONTRACT_ADDRESS = "0xEB81D05a54068A662aD7aC62CF1Df91cD5e9DdE6";
-export const CONCORD_AUCTION_ADDRESS = "0xE3cfEDb40575412574d1107730ade283237Ab1df";
+export const CONCORD_AUCTION_ADDRESS = "0x9681F330E8729C8B4937552783A11De2a8604DD6";
 export const CONCORD_NETWORK = "Base Sepolia";
 export const CONCORD_CHAIN_ID = 84532;
 export const CONCORD_EXPLORER = "https://sepolia.basescan.org";

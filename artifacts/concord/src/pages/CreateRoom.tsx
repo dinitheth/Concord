@@ -524,6 +524,27 @@ export default function CreateRoom() {
                                     <option value="">{field.placeholder}</option>
                                     {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
                                   </select>
+                                ) : field.type === "currency" ? (
+                                  (() => {
+                                    const units = field.units || ["USD", "K", "M", "B"];
+                                    return (
+                                      <div style={{ display: "flex", gap: 10 }}>
+                                        <input
+                                          type="number"
+                                          step="any"
+                                          placeholder={field.placeholder}
+                                          className="apple-input"
+                                          style={{ flex: 1, padding: "10px 14px", borderRadius: 12, fontSize: 13, fontWeight: 500, background: "hsl(var(--input))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))", outline: "none" }}
+                                        />
+                                        <select
+                                          className="apple-input"
+                                          style={{ width: 90, padding: "10px 14px", borderRadius: 12, fontSize: 13, fontWeight: 500, background: "hsl(var(--input))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))", outline: "none", textAlign: "center" }}
+                                        >
+                                          {units.map(u => <option key={u} value={u}>{u}</option>)}
+                                        </select>
+                                      </div>
+                                    );
+                                  })()
                                 ) : (
                                   <input
                                     type={field.type}

@@ -294,6 +294,35 @@ contract MultiPartyAuction {
         emit AuctionInviteSent(auctionId, msg.sender, recipient, block.timestamp);
     }
 
+    /**
+     * @notice Send invites to multiple bidders in a single transaction.
+     * @param auctionId   The auction to invite bidders to
+     * @param recipients  Array of bidder wallet addresses
+     */
+    function sendBatchInvites(bytes32 auctionId, address[] calldata recipients) external {
+        require(auctionExists[auctionId], "Auction does not exist");
+        require(auctions[auctionId].seller == msg.sender, "Only seller can send invites");
+        require(recipients.length > 0, "No recipients provided");
+        require(recipients.length <= 10, "Too many recipients");
+
+        Invite memory invite = Invite({
+            auctionId: auctionId,
+            sender: msg.sender,
+            timestamp: block.timestamp,
+            negotiationType: auctions[auctionId].negotiationType
+        });
+
+        for (uint256 i = 0; i < recipients.length; i++) {
+            require(recipients[i] != msg.sender, "Cannot invite yourself");
+            require(recipients[i] != address(0), "Invalid recipient");
+
+            receivedInvites[recipients[i]].push(invite);
+            sentInvites[msg.sender].push(invite);
+
+            emit AuctionInviteSent(auctionId, msg.sender, recipients[i], block.timestamp);
+        }
+    }
+
     // ── View Functions ───────────────────────────────────────────
 
     function getAuctionInfo(bytes32 auctionId) external view returns (

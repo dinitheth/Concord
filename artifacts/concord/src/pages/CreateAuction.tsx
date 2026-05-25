@@ -127,6 +127,22 @@ export default function CreateAuction() {
       });
       setTxHash(hash);
 
+      const cleanMetadata: Record<string, string> = {};
+      Object.keys(metadata).forEach(k => {
+        const val = metadata[k];
+        const fieldDef = meta.dashboardFields.find(f => f.key === k);
+        if (fieldDef && fieldDef.type === "currency") {
+          const units = fieldDef.units || ["USD", "K", "M", "B"];
+          const matchedUnit = units.find(u => val.endsWith(u));
+          const numPart = matchedUnit ? val.slice(0, -matchedUnit.length) : val;
+          if (numPart.trim()) {
+            cleanMetadata[k] = val;
+          }
+        } else if (val && val.trim()) {
+          cleanMetadata[k] = val;
+        }
+      });
+
       saveAuction({
         id: auctionIdHex,
         auctionIdHex,
@@ -141,7 +157,7 @@ export default function CreateAuction() {
         maxBidders,
         bids: [],
         seller: { address: walletAddr, timestamp: Date.now() },
-        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+        metadata: Object.keys(cleanMetadata).length > 0 ? cleanMetadata : undefined,
         createdAt: Date.now(),
         deadline: Number(deadlineTs) * 1000,
         txHash: hash,
@@ -154,29 +170,24 @@ export default function CreateAuction() {
       // ── Automatically send invites to all valid addresses ──────
       const validAddresses = bidderAddresses
         .map(a => a.trim())
-        .filter(a => a.startsWith("0x") && a.length === 42);
+        .filter(a => a.startsWith("0x") && a.length === 42) as `0x${string}`[];
 
       if (validAddresses.length > 0) {
-        let sentCount = 0;
-        for (let i = 0; i < validAddresses.length; i++) {
-          try {
-            setEncryptStep(`Sending invite ${i + 1} of ${validAddresses.length}…`);
-            const invHash = await walletClient.writeContract({
-              address: MULTI_PARTY_AUCTION_ADDRESS,
-              abi: MULTI_PARTY_AUCTION_ABI,
-              functionName: "sendInvite",
-              args: [auctionIdHex as `0x${string}`, validAddresses[i] as `0x${string}`],
-              chain: walletClient.chain,
-              account: walletClient.account,
-            });
-            await publicClient.waitForTransactionReceipt({ hash: invHash, confirmations: 1 });
-            sentCount++;
-          } catch (err: any) {
-            console.error(`[CreateAuction] Invite ${i + 1} failed:`, err);
-            // Continue with remaining invites
-          }
+        try {
+          setEncryptStep(`Sending batch invites to ${validAddresses.length} bidders…`);
+          const invHash = await walletClient.writeContract({
+            address: MULTI_PARTY_AUCTION_ADDRESS,
+            abi: MULTI_PARTY_AUCTION_ABI,
+            functionName: "sendBatchInvites",
+            args: [auctionIdHex as `0x${string}`, validAddresses],
+            chain: walletClient.chain,
+            account: walletClient.account,
+          });
+          await publicClient.waitForTransactionReceipt({ hash: invHash, confirmations: 1 });
+          setInvitedCount(validAddresses.length);
+        } catch (err: any) {
+          console.error(`[CreateAuction] Batch invites failed:`, err);
         }
-        setInvitedCount(sentCount);
       }
 
       setEncStatus("done");
@@ -256,6 +267,48 @@ export default function CreateAuction() {
                           <option value="">{field.placeholder}</option>
                           {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
                         </select>
+                      ) : field.type === "currency" ? (
+                        (() => {
+                          const units = field.units || ["USD", "K", "M", "B"];
+                          const val = metadata[field.key] || "";
+                          let numValue = "";
+                          let unitValue = units[0] || "M";
+                          const matchedUnit = units.find(u => val.endsWith(u));
+                          if (matchedUnit) {
+                            unitValue = matchedUnit;
+                            numValue = val.slice(0, -matchedUnit.length);
+                          } else if (val) {
+                            numValue = val;
+                          }
+
+                          const handleNumChange = (newNum: string) => {
+                            if (!newNum) {
+                              setMetadata(prev => {
+                                const next = { ...prev };
+                                delete next[field.key];
+                                return next;
+                              });
+                            } else {
+                              setMetadata(prev => ({ ...prev, [field.key]: `${newNum}${unitValue}` }));
+                            }
+                          };
+
+                          const handleUnitChange = (newUnit: string) => {
+                            setMetadata(prev => ({ ...prev, [field.key]: `${numValue}${newUnit}` }));
+                          };
+
+                          return (
+                            <div className="flex gap-2">
+                              <input type="number" step="any" value={numValue} onChange={e => handleNumChange(e.target.value)}
+                                placeholder={field.placeholder}
+                                className="flex-1 apple-card px-4 py-2.5 text-[13px] text-foreground bg-transparent outline-none placeholder:text-foreground/20" />
+                              <select value={unitValue} onChange={e => handleUnitChange(e.target.value)}
+                                className="apple-card px-3 py-2.5 text-[13px] text-foreground bg-transparent outline-none w-[90px] text-center">
+                                {units.map(u => <option key={u} value={u}>{u}</option>)}
+                              </select>
+                            </div>
+                          );
+                        })()
                       ) : (
                         <input type={field.type} value={metadata[field.key] || ""} onChange={e => setMetadata(prev => ({ ...prev, [field.key]: e.target.value }))}
                           placeholder={field.placeholder}
