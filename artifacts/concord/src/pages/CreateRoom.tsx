@@ -279,6 +279,7 @@ export default function CreateRoom() {
         args: [roomId as `0x${string}`, recipient as `0x${string}`],
         chain: walletClient.chain,
         account: walletClient.account,
+        gas: 300_000n, // explicit gas limit — RPC estimation can overshoot on dynamic array push
       });
       // Wait for confirmation
       await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
