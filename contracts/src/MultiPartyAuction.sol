@@ -106,12 +106,14 @@ contract MultiPartyAuction {
         InEuint64 calldata encFloor,
         uint8 nType,
         uint256 deadline,
-        uint8 maxBidders
+        uint8 maxBidders,
+        address[] calldata recipients
     ) external {
         require(!auctionExists[auctionId], "Auction already exists");
         require(deadline > block.timestamp, "Deadline must be in the future");
         require(nType <= 3, "Invalid negotiation type");
         require(maxBidders >= 1 && maxBidders <= 10, "Max bidders must be 1-10");
+        require(recipients.length <= maxBidders, "Recipients exceed maxBidders");
 
         Auction storage auction = auctions[auctionId];
         auction.seller = msg.sender;
@@ -130,6 +132,26 @@ contract MultiPartyAuction {
         auctionExists[auctionId] = true;
 
         emit AuctionCreated(auctionId, msg.sender, nType, deadline, maxBidders, block.timestamp);
+
+        // Send invites atomically if provided
+        if (recipients.length > 0) {
+            Invite memory invite = Invite({
+                auctionId: auctionId,
+                sender: msg.sender,
+                timestamp: block.timestamp,
+                negotiationType: nType
+            });
+
+            for (uint256 i = 0; i < recipients.length; i++) {
+                require(recipients[i] != msg.sender, "Cannot invite yourself");
+                require(recipients[i] != address(0), "Invalid recipient");
+
+                receivedInvites[recipients[i]].push(invite);
+                sentInvites[msg.sender].push(invite);
+
+                emit AuctionInviteSent(auctionId, msg.sender, recipients[i], block.timestamp);
+            }
+        }
     }
 
     /**

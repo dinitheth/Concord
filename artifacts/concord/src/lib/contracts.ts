@@ -10,8 +10,8 @@ import { baseSepolia } from "wagmi/chains";
 
 // ── Contract Addresses ──────────────────────────────────────────
 // Wave 4 deployment — Base Sepolia (Chain 84532)
-export const BLIND_NEGOTIATION_ADDRESS: Address  = "0x22F29DE6B4894970a8D929f5536Bb1132A15dec1";
-export const CONFIDENTIAL_ESCROW_ADDRESS: Address = "0x305a0d88419F3f7024e5f661b977D9F12fd398EC";
+export const BLIND_NEGOTIATION_ADDRESS: Address  = "0x78309D8fE023142AE64D36A3dC552A158A137A00";
+export const CONFIDENTIAL_ESCROW_ADDRESS: Address = "0xe9e877d5C111d91FAe6758a1AccFFDf1d333F1B0";
 
 // USDC on Base Sepolia
 export const USDC_ADDRESS: Address = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -549,7 +549,7 @@ export function mapOnChainStatus(status: number): "open" | "pending_b" | "comput
 
 // ── Wave 5: Multi-Party Auction ─────────────────────────────────
 
-export const MULTI_PARTY_AUCTION_ADDRESS: Address = "0x843b013bb104e416EeA8C8cC00C377B095A1c592";
+export const MULTI_PARTY_AUCTION_ADDRESS: Address = "0xF0c16bAFb7EF0E6Cd6266EE7D46Eb4B3Dd6D5FF7";
 
 export const MULTI_PARTY_AUCTION_ABI = [
   // createAuction
@@ -567,6 +567,7 @@ export const MULTI_PARTY_AUCTION_ABI = [
       { name: "nType", type: "uint8" },
       { name: "deadline", type: "uint256" },
       { name: "maxBidders", type: "uint8" },
+      { name: "recipients", type: "address[]" },
     ],
     outputs: [],
     stateMutability: "nonpayable",

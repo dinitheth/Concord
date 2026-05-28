@@ -122,12 +122,18 @@ export default function CreateAuction() {
         ? BigInt(Math.floor(new Date(deadline).getTime() / 1000))
         : BigInt(Math.floor(Date.now() / 1000) + 7 * 24 * 3600);
 
+      const uniqueAddresses = Array.from(new Set(
+        bidderAddresses
+          .map(a => a.trim())
+          .filter(a => a.startsWith("0x") && a.length === 42 && a.toLowerCase() !== walletAddr.toLowerCase())
+      )) as `0x${string}`[];
+
       setEncryptStep("Submitting auction to blockchain…");
       const hash = await walletClient.writeContract({
         address: MULTI_PARTY_AUCTION_ADDRESS,
         abi: MULTI_PARTY_AUCTION_ABI,
         functionName: "createAuction",
-        args: [auctionIdHex, (encrypted as any).encryptedInput, nTypeIndex, deadlineTs, maxBidders],
+        args: [auctionIdHex, (encrypted as any).encryptedInput, nTypeIndex, deadlineTs, maxBidders, uniqueAddresses],
         chain: walletClient.chain,
         account: walletClient.account,
       });
@@ -173,40 +179,10 @@ export default function CreateAuction() {
       await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
       setAuctionConfirmed(true);
 
-      // ── Automatically send invites to all valid addresses ──────
-      const uniqueAddresses = Array.from(new Set(
-        bidderAddresses
-          .map(a => a.trim())
-          .filter(a => a.startsWith("0x") && a.length === 42 && a.toLowerCase() !== walletAddr.toLowerCase())
-      )) as `0x${string}`[];
-
-      if (uniqueAddresses.length > 0) {
-        try {
-          setEncryptStep("Syncing blockchain state…");
-          await new Promise(resolve => setTimeout(resolve, 4000));
-
-          setEncryptStep(`Sending batch invites to ${uniqueAddresses.length} bidders…`);
-          setInviteStatus("sending");
-          const invHash = await walletClient.writeContract({
-            address: MULTI_PARTY_AUCTION_ADDRESS,
-            abi: MULTI_PARTY_AUCTION_ABI,
-            functionName: "sendBatchInvites",
-            args: [auctionIdHex as `0x${string}`, uniqueAddresses],
-            chain: walletClient.chain,
-            account: walletClient.account,
-            gas: 500000n, // Bypass gas estimation failure due to node sync lag
-          });
-          await publicClient.waitForTransactionReceipt({ hash: invHash, confirmations: 1 });
-          setInvitedCount(uniqueAddresses.length);
-          setInvitedAddresses(uniqueAddresses);
-          setFailedInviteAddresses([]);
-          setInviteStatus("done");
-        } catch (err: any) {
-          console.error(`[CreateAuction] Batch invites failed:`, err);
-          setFailedInviteAddresses(uniqueAddresses);
-          setInviteStatus("error");
-        }
-      }
+      setInvitedCount(uniqueAddresses.length);
+      setInvitedAddresses(uniqueAddresses);
+      setFailedInviteAddresses([]);
+      setInviteStatus("done");
 
       setEncStatus("done");
       setEncryptStep("");
