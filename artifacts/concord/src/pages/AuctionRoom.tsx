@@ -8,7 +8,7 @@ import NavBar from "@/components/NavBar";
 import FHEBadge from "@/components/FHEBadge";
 import { getAuction, saveAuction, updateAuction, NEGOTIATION_TYPES, formatPrice, type Auction } from "@/lib/concord";
 import { encryptPrice, initFHE } from "@/lib/fhe";
-import { MULTI_PARTY_AUCTION_ABI, MULTI_PARTY_AUCTION_ADDRESS, auctionConfig, mapAuctionStatus, roomIdToCode } from "@/lib/contracts";
+import { MULTI_PARTY_AUCTION_ABI, MULTI_PARTY_AUCTION_ADDRESS, auctionConfig, mapAuctionStatus, roomIdToCode, decodeAuctionId } from "@/lib/contracts";
 
 function timeLeft(deadline: number): string {
   const diff = deadline - Date.now();
@@ -50,7 +50,28 @@ export default function AuctionRoom() {
   useEffect(() => {
     if (!id) return;
     const a = getAuction(id);
-    if (a) setAuction(a);
+    if (a) {
+      setAuction(a);
+    } else {
+      // Decode floor price and unit from ID for fallback state
+      const decoded = decodeAuctionId(id);
+      if (decoded) {
+        setAuction({
+          id,
+          auctionIdHex: id,
+          type: "custom",
+          label: "Auction",
+          status: "bidding",
+          sellerPrice: decoded.price,
+          sellerPriceUnit: decoded.unit,
+          maxBidders: 5,
+          bids: [],
+          seller: { address: "", timestamp: Date.now() },
+          createdAt: Date.now(),
+          deadline: Date.now() + 86400000,
+        });
+      }
+    }
   }, [id]);
 
   // Merge on-chain data
@@ -61,6 +82,10 @@ export default function AuctionRoom() {
 
     const local = getAuction(id);
     const negKey = (["ma", "salary", "realestate", "custom"] as const)[negType] || "custom";
+
+    const decoded = decodeAuctionId(id);
+    const sellerPrice = local?.sellerPrice ?? decoded?.price;
+    const sellerPriceUnit = local?.sellerPriceUnit ?? decoded?.unit;
 
     const updated: Auction = {
       ...(local || {
@@ -76,6 +101,8 @@ export default function AuctionRoom() {
       }),
       status: mapAuctionStatus(status),
       maxBidders,
+      sellerPrice,
+      sellerPriceUnit,
       bids: (() => {
         const merged = [...(local?.bids || [])];
         if (merged.length > currentBids) {

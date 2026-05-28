@@ -8,7 +8,7 @@ import NavBar from "@/components/NavBar";
 import FHEBadge from "@/components/FHEBadge";
 import { NEGOTIATION_TYPES, saveAuction, type NegotiationType, type PriceUnit } from "@/lib/concord";
 import { encryptPrice, initFHE, type FHEStatus } from "@/lib/fhe";
-import { MULTI_PARTY_AUCTION_ABI, MULTI_PARTY_AUCTION_ADDRESS, generateRoomIdBytes32, roomIdToCode } from "@/lib/contracts";
+import { MULTI_PARTY_AUCTION_ABI, MULTI_PARTY_AUCTION_ADDRESS, generateRoomIdBytes32, generateAuctionIdBytes32, roomIdToCode } from "@/lib/contracts";
 
 const LABEL_STYLE = {
   fontSize: 10, fontWeight: 700, color: "hsl(var(--foreground))", opacity: 0.75,
@@ -114,7 +114,7 @@ export default function CreateAuction() {
         }
       });
 
-      const auctionIdHex = generateRoomIdBytes32();
+      const auctionIdHex = generateAuctionIdBytes32(parsedPrice, priceUnit);
       setAuctionId(auctionIdHex);
 
       const nTypeIndex = (["ma", "salary", "realestate", "custom"] as const).indexOf(type);

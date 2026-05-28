@@ -490,6 +490,61 @@ export function generateRoomIdBytes32(): Hex {
 }
 
 /**
+ * Generate a bytes32 hex representing a unique auction ID that encodes the floor price and price unit.
+ * Schema:
+ * - Bytes 0-11: random bytes (24 hex characters)
+ * - Byte 12: version marker (e.g. 0xaa)
+ * - Bytes 13-20: floor price * 100 as uint64 hex (16 hex characters)
+ * - Byte 21: price unit index (0=USD, 1=K, 2=M, 3=B) (2 hex characters)
+ * - Bytes 22-31: random suffix (20 hex characters)
+ */
+export function generateAuctionIdBytes32(price: number, unit: "USD" | "K" | "M" | "B"): Hex {
+  const rand1Bytes = new Uint8Array(12);
+  crypto.getRandomValues(rand1Bytes);
+  const rand1 = Array.from(rand1Bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+
+  const marker = "aa";
+
+  const priceVal = BigInt(Math.round(price * 100));
+  const priceHex = priceVal.toString(16).padStart(16, "0");
+
+  const units = ["USD", "K", "M", "B"];
+  const unitIdx = units.indexOf(unit);
+  const unitHex = (unitIdx >= 0 ? unitIdx : 0).toString(16).padStart(2, "0");
+
+  const rand2Bytes = new Uint8Array(10);
+  crypto.getRandomValues(rand2Bytes);
+  const rand2 = Array.from(rand2Bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+
+  return `0x${rand1}${marker}${priceHex}${unitHex}${rand2}` as Hex;
+}
+
+/**
+ * Decode floor price and unit from an auction ID if encoded.
+ */
+export function decodeAuctionId(auctionId: string): { price: number; unit: "USD" | "K" | "M" | "B" } | null {
+  if (!auctionId || !auctionId.startsWith("0x") || auctionId.length !== 66) {
+    return null;
+  }
+  const clean = auctionId.slice(2);
+  const marker = clean.slice(24, 26);
+  if (marker !== "aa") {
+    return null;
+  }
+
+  const priceHex = clean.slice(26, 42);
+  const priceVal = parseInt(priceHex, 16) / 100;
+
+  const unitHex = clean.slice(42, 44);
+  const unitIdx = parseInt(unitHex, 16);
+  const units: ("USD" | "K" | "M" | "B")[] = ["USD", "K", "M", "B"];
+  const unit = units[unitIdx] || "USD";
+
+  return { price: priceVal, unit };
+}
+
+
+/**
  * Convert a room code (6 chars) to match against room IDs
  */
 export function roomIdToCode(roomId: Hex): string {
