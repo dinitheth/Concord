@@ -39,6 +39,7 @@ export default function CreateAuction() {
   const [txHash, setTxHash] = useState("");
   const [codeCopied, setCodeCopied] = useState(false);
   const [metadata, setMetadata] = useState<Record<string, string>>({});
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // ── Batch bidder address inputs ───────────────────────────────
   const [bidderAddresses, setBidderAddresses] = useState<string[]>(Array(5).fill(""));
@@ -486,15 +487,181 @@ export default function CreateAuction() {
                 <Wallet className="w-4 h-4" /> Connect Wallet
               </button>
             ) : (
-              <button onClick={handleSubmit} disabled={!price || parseFloat(price) <= 0}
+              <button onClick={() => setShowConfirm(true)} disabled={!price || parseFloat(price) <= 0}
                 className="btn-apple w-full py-3.5 text-[14px] flex items-center justify-center gap-2 disabled:opacity-30">
                 <Lock className="w-4 h-4" />
                 {validCount > 0
-                  ? `Encrypt Floor, Create & Invite ${validCount} Bidder${validCount !== 1 ? "s" : ""}`
-                  : "Encrypt Floor & Create Auction"}
+                  ? `Review & Create Auction (${validCount} Bidders)`
+                  : "Review & Create Auction"}
               </button>
             )}
           </motion.div>
+
+          {/* ── CONFIRMATION MODAL ────────────────────────────────────────── */}
+          <AnimatePresence>
+            {showConfirm && (
+              <>
+                {/* Backdrop */}
+                <motion.div
+                  key="confirm-backdrop"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowConfirm(false)}
+                  style={{
+                    position: "fixed", inset: 0, zIndex: 100,
+                    background: "rgba(0,0,0,0.5)", backdropFilter: "blur(12px)"
+                  }}
+                />
+
+                {/* Centering wrapper */}
+                <div style={{
+                  position: "fixed", inset: 0, zIndex: 101,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  pointerEvents: "none", padding: 20,
+                }}>
+                  {/* Animated modal */}
+                  <motion.div
+                    key="confirm-sheet"
+                    initial={{ opacity: 0, y: 40, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 30, scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 340, damping: 30 }}
+                    style={{
+                      width: "100%", maxWidth: 540, maxHeight: "85vh", overflowY: "auto",
+                      background: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: 24,
+                      padding: "28px 28px 32px",
+                      boxShadow: "0 32px 100px rgba(0,0,0,0.5)",
+                      pointerEvents: "auto",
+                    }}
+                  >
+                    {/* Handle */}
+                    <div style={{ width: 36, height: 4, borderRadius: 99, background: "hsl(var(--muted-foreground))", margin: "0 auto 24px" }} />
+
+                    {/* Header */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: "50%", background: "rgba(255,149,0,0.12)", border: "1px solid rgba(255,149,0,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Gavel style={{ width: 18, height: 18, color: "#ff9500" }} />
+                      </div>
+                      <div>
+                        <h2 style={{ fontSize: 18, fontWeight: 700, color: "hsl(var(--foreground))", margin: 0, lineHeight: 1.2 }}>Confirm Auction Details</h2>
+                        <p style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", margin: 0 }}>Review everything before encrypting your floor price</p>
+                      </div>
+                    </div>
+
+                    {/* Divider */}
+                    <div style={{ height: 1, background: "hsl(var(--muted-foreground))", marginBottom: 20 }} />
+
+                    {/* Summary rows */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
+
+                      {/* Type */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Deal Type</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, padding: "2px 10px", borderRadius: 20, background: "rgba(255,149,0,0.12)", border: "1px solid rgba(255,149,0,0.25)", color: "#ff9500" }}>{meta.label}</span>
+                      </div>
+
+                      {/* Deal name */}
+                      {dealName && (
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Deal Title</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--foreground))" }}>{dealName}</span>
+                        </div>
+                      )}
+
+                      {/* Description */}
+                      {dealDesc && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Description</span>
+                          <span style={{ fontSize: 12, color: "hsl(var(--foreground))", lineHeight: 1.5, padding: "8px 12px", borderRadius: 10, background: "hsl(var(--secondary))", border: "1px solid hsl(var(--border))" }}>{dealDesc}</span>
+                        </div>
+                      )}
+
+                      {/* Terms */}
+                      {selectedTerms.length > 0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                          <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", flexShrink: 0 }}>Terms</span>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, justifyContent: "flex-end" }}>
+                            {selectedTerms.map(t => (
+                              <span key={t} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "rgba(255,149,0,0.1)", border: "1px solid rgba(255,149,0,0.2)", color: "#ff9500" }}>{t}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Max Bidders */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Max Bidders</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--foreground))" }}>{maxBidders}</span>
+                      </div>
+
+                      {/* Bidders to Invite */}
+                      {uniqueAddressesForDisplay.length > 0 && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Bidders to Invite ({uniqueAddressesForDisplay.length})</span>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: 100, overflowY: "auto", padding: "8px 12px", borderRadius: 10, background: "hsl(var(--secondary))", border: "1px solid hsl(var(--border))" }}>
+                            {uniqueAddressesForDisplay.map((addr, idx) => (
+                              <div key={idx} style={{ fontSize: 11, fontFamily: "monospace", color: "hsl(var(--foreground))", opacity: 0.7 }}>
+                                {idx + 1}. {addr.slice(0, 12)}…{addr.slice(-6)}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Deadline */}
+                      {deadline && (
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Bidding Deadline</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "hsl(var(--foreground))" }}>{new Date(deadline).toLocaleString()}</span>
+                        </div>
+                      )}
+
+                      {/* Divider */}
+                      <div style={{ height: 1, background: "hsl(var(--muted-foreground))" }} />
+
+                      {/* Floor price */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 12, background: "rgba(255,149,0,0.06)", border: "1px solid rgba(255,149,0,0.18)" }}>
+                        <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Floor Price (will be encrypted)</span>
+                        <span style={{ fontSize: 20, fontWeight: 800, color: "hsl(var(--foreground))", fontFamily: "monospace" }}>
+                          ${price} <span style={{ fontSize: 12, fontWeight: 500, color: "hsl(var(--muted-foreground))" }}>{priceUnit === "USD" ? "USD" : `${priceUnit} USD`}</span>
+                        </span>
+                      </div>
+
+                    </div>
+
+                    {/* Warning note */}
+                    <div style={{ padding: "10px 14px", borderRadius: 12, background: "rgba(255,159,10,0.07)", border: "1px solid rgba(255,159,10,0.18)", marginBottom: 20 }}>
+                      <p style={{ fontSize: 11, color: "rgba(255,159,10,0.85)", lineHeight: 1.6, margin: 0 }}>
+                        ⚠️  Once encrypted, your floor price cannot be changed. Make sure everything looks correct before confirming.
+                      </p>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button
+                        onClick={() => setShowConfirm(false)}
+                        className="btn-ghost"
+                        style={{ flex: 1, padding: "13px", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >
+                        Go Back
+                      </button>
+                      <button
+                        onClick={() => { setShowConfirm(false); handleSubmit(); }}
+                        className="btn-apple"
+                        style={{ flex: 2, padding: "13px", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "linear-gradient(135deg, #ff9500, #ff5e00)", border: "none" }}
+                      >
+                        <Lock style={{ width: 15, height: 15 }} />
+                        Confirm &amp; Encrypt Floor
+                      </button>
+                    </div>
+                  </motion.div>
+                </div>
+              </>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     );
