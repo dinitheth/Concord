@@ -9,7 +9,7 @@ import { useAccount, usePublicClient, useWalletClient, useReadContract } from "w
 import { useModal } from "connectkit";
 import NavBar from "@/components/NavBar";
 import FHEBadge from "@/components/FHEBadge";
-import { getRoom, saveRoom, NEGOTIATION_TYPES, type Room } from "@/lib/concord";
+import { getRoom, saveRoom, NEGOTIATION_TYPES, type Room, type PriceUnit, normalizeToDefaultUnit } from "@/lib/concord";
 import { encryptPrice, initFHE, formatCtHash } from "@/lib/fhe";
 import { BLIND_NEGOTIATION_ABI, BLIND_NEGOTIATION_ADDRESS, getExplorerTxUrl, roomIdToCode } from "@/lib/contracts";
 
@@ -154,12 +154,15 @@ export default function RoomPage() {
   const [notFound, setNotFound] = useState(false);
   const [feed, setFeed] = useState<FeedEventType[]>([]);
   const [price, setPrice] = useState("");
+  const [priceUnit, setPriceUnit] = useState<PriceUnit>("M");
   const [submitStatus, setSubmitStatus] = useState<"idle" | "encrypting" | "computing" | "done" | "error">("idle");
   const [encryptStep, setEncryptStep] = useState("");
   const [encryptError, setEncryptError] = useState("");
   const [codeCopied, setCodeCopied] = useState(false);
   const feedEndRef = useRef<HTMLDivElement>(null);
   const roomCode = id.startsWith("0x") ? roomIdToCode(id as `0x${string}`) : id.replace(/-/g, "").toUpperCase().slice(0, 3) + "·" + id.replace(/-/g, "").toUpperCase().slice(3, 6);
+  const isPartyA = room?.partyA?.address?.toLowerCase() === walletAddr?.toLowerCase();
+  const meta = room ? NEGOTIATION_TYPES[room.type] : null;
 
   // Query on-chain room info — polls every 8s to detect counterparty joining
   const { data: onChainInfo } = useReadContract({
@@ -233,6 +236,14 @@ export default function RoomPage() {
   }, [id, onChainInfo, walletAddr]);
 
   useEffect(() => {
+    if (room?.myPriceUnit) {
+      setPriceUnit(room.myPriceUnit);
+    } else if (meta?.unit) {
+      setPriceUnit(meta.unit as PriceUnit);
+    }
+  }, [room?.myPriceUnit, meta?.unit]);
+
+  useEffect(() => {
     feedEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [feed]);
 
@@ -266,16 +277,37 @@ export default function RoomPage() {
     setTimeout(() => setCodeCopied(false), 2500);
   };
 
-  const isPartyA = room?.partyA?.address?.toLowerCase() === walletAddr?.toLowerCase();
-  const meta = room ? NEGOTIATION_TYPES[room.type] : null;
   const parsedPrice = parseFloat(price);
   const isValid = !isNaN(parsedPrice) && parsedPrice > 0;
 
+  const getPlaceholder = () => {
+    if (!meta) return "";
+    const base = meta.placeholder.replace("e.g. ", "").replace(/,/g, "");
+    const baseNum = parseFloat(base);
+    if (isNaN(baseNum)) return meta.placeholder;
+
+    // Convert from meta.unit to USD first
+    let usdValue = baseNum;
+    if (meta.unit === "M") usdValue = baseNum * 1000000;
+    else if (meta.unit === "K") usdValue = baseNum * 1000;
+    else if (meta.unit === "B") usdValue = baseNum * 1000000000;
+
+    // Then convert from USD to priceUnit
+    let displayVal = usdValue;
+    if (priceUnit === "M") displayVal = usdValue / 1000000;
+    else if (priceUnit === "K") displayVal = usdValue / 1000;
+    else if (priceUnit === "B") displayVal = usdValue / 1000000000;
+
+    return `e.g. ${displayVal.toLocaleString(undefined, { maximumFractionDigits: 4 })}`;
+  };
+
   const handleSubmit = async () => {
-    if (!room || !isValid || !walletConnected || isPartyA || !publicClient || !walletClient) return;
+    if (!room || !meta || !isValid || !walletConnected || isPartyA || !publicClient || !walletClient) return;
     setSubmitStatus("encrypting");
     setEncryptStep("Initializing FHE");
     setEncryptError("");
+
+    const normalizedPrice = normalizeToDefaultUnit(parsedPrice, priceUnit, meta.unit);
 
     const MAX_ATTEMPTS = 3;
     const TIMEOUT_MS = 60000; // 60s per attempt
@@ -298,7 +330,7 @@ export default function RoomPage() {
 
         // 2. Encrypt with timeout
         const encrypted = await Promise.race([
-          encryptPrice(BigInt(Math.round(parsedPrice)), (progress) => {
+          encryptPrice(BigInt(Math.round(normalizedPrice)), (progress) => {
             if (progress.isStart) {
               const label = stepLabels[progress.step] || progress.step;
               setEncryptStep(attempt > 1 ? `Retry ${attempt}/${MAX_ATTEMPTS}. ${label}` : label);
@@ -337,6 +369,7 @@ export default function RoomPage() {
           ...room,
           partyB: { address: walletAddr!, timestamp: Date.now() },
           myPrice: Number(parsedPrice),
+          myPriceUnit: priceUnit,
           status: "settled",
           result: { matched: false, isEncrypted: true, timestamp: Date.now(), txHash: hash } as any,
         };
@@ -384,6 +417,8 @@ export default function RoomPage() {
       const updatedRoom: Room = {
         ...room,
         partyB: { address: walletAddr!, timestamp: Date.now() },
+        myPrice: Number(parsedPrice),
+        myPriceUnit: priceUnit,
         status: "settled",
         result: { matched: true, timestamp: Date.now(), txHash: "demo-mode" },
       };
@@ -536,12 +571,21 @@ export default function RoomPage() {
                     type="number"
                     value={price}
                     onChange={e => setPrice(e.target.value)}
-                    placeholder={meta?.placeholder}
+                    placeholder={getPlaceholder()}
                     className="apple-input w-full py-3.5 pl-8 pr-3 text-[15px]"
                     onKeyDown={e => e.key === "Enter" && isValid && handleSubmit()}
                   />
                 </div>
-                {meta?.unit && <span className="text-[13px] text-foreground/30 font-mono shrink-0">{meta.unit}</span>}
+                <select
+                  value={priceUnit}
+                  onChange={e => setPriceUnit(e.target.value as PriceUnit)}
+                  className="apple-input px-2.5 py-3.5 text-[13px] text-foreground bg-[rgba(255,255,255,0.03)] border border-white/10 rounded-xl outline-none font-semibold w-[80px] text-center cursor-pointer shrink-0 transition-all hover:bg-white/5 focus:border-white/20"
+                >
+                  <option value="M" className="bg-[#1c1c1e] text-foreground">M</option>
+                  <option value="K" className="bg-[#1c1c1e] text-foreground">K</option>
+                  <option value="B" className="bg-[#1c1c1e] text-foreground">B</option>
+                  <option value="USD" className="bg-[#1c1c1e] text-foreground">USD</option>
+                </select>
                 <button
                   onClick={handleSubmit}
                   disabled={!isValid}

@@ -287,3 +287,21 @@ export const CONCORD_AUCTION_ADDRESS = "0xe0A48263eeEa990Dd73CE9477Ef776f5D29a4c
 export const CONCORD_NETWORK = "Base Sepolia";
 export const CONCORD_CHAIN_ID = 84532;
 export const CONCORD_EXPLORER = "https://sepolia.basescan.org";
+
+export function normalizeToDefaultUnit(value: number, fromUnit: PriceUnit, toUnit: string): number {
+  if (isNaN(value) || value <= 0) return 0;
+  
+  // 1. Convert to USD first
+  let usdValue = value;
+  if (fromUnit === "M") usdValue = value * 1000000;
+  else if (fromUnit === "K") usdValue = value * 1000;
+  else if (fromUnit === "B") usdValue = value * 1000000000;
+
+  // 2. Convert from USD to the target default unit
+  let targetValue = usdValue;
+  if (toUnit === "M") targetValue = usdValue / 1000000;
+  else if (toUnit === "K") targetValue = usdValue / 1000;
+  else if (toUnit === "B") targetValue = usdValue / 1000000000;
+
+  return targetValue;
+}

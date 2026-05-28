@@ -327,7 +327,7 @@ export default function ProfilePage() {
                               {room.dealName || room.label}
                               {room.myPrice ? (
                                 <span className="font-normal text-foreground/50 ml-1">
-                                  · {room.myPrice}{room.myPriceUnit ?? ""}
+                                  · {room.myPriceUnit === "USD" ? `$${room.myPrice.toLocaleString()}` : room.myPriceUnit ? `$${room.myPrice}${room.myPriceUnit}` : `$${room.myPrice.toLocaleString()}`}
                                 </span>
                               ) : null}
                             </span>

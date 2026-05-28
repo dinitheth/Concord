@@ -8,7 +8,7 @@ import { useModal } from "connectkit";
 import NavBar from "@/components/NavBar";
 import FHEBadge from "@/components/FHEBadge";
 import EncryptionVisualizer from "@/components/EncryptionVisualizer";
-import { NEGOTIATION_TYPES, saveRoom, getRoom, type NegotiationType, type PriceUnit } from "@/lib/concord";
+import { NEGOTIATION_TYPES, saveRoom, getRoom, type NegotiationType, type PriceUnit, normalizeToDefaultUnit } from "@/lib/concord";
 import { encryptPrice, initFHE, type FHEStatus, type EncryptProgress } from "@/lib/fhe";
 // On-chain invites — no external messaging service needed
 import { BLIND_NEGOTIATION_ABI, BLIND_NEGOTIATION_ADDRESS, generateRoomIdBytes32, roomIdToCode, getExplorerTxUrl } from "@/lib/contracts";
@@ -180,9 +180,11 @@ export default function CreateRoom() {
       // connect() is fast — no-op if already connected
       await initFHE(publicClient, walletClient);
 
+      const normalizedPrice = normalizeToDefaultUnit(parsedPrice, priceUnit, meta.unit);
+
       // Encrypt with detailed step tracking
       setEncryptStep("Starting encryption…");
-      const encrypted = await encryptPrice(BigInt(Math.round(parsedPrice)), (progress) => {
+      const encrypted = await encryptPrice(BigInt(Math.round(normalizedPrice)), (progress) => {
         if (progress.isStart) {
           setEncryptStep(stepLabels[progress.step] || progress.step);
         }
