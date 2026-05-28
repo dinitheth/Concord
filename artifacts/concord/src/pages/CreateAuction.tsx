@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Check, Copy, Wallet, ShieldCheck, ArrowRight, Send, Calendar, Activity, Zap, Users, Gavel, Clipboard } from "lucide-react";
+import { Lock, Check, Copy, Wallet, ShieldCheck, ArrowRight, Send, Calendar, Activity, Zap, Users, Gavel, Clipboard, AlertCircle, Loader2 } from "lucide-react";
 import { useAccount, useDisconnect, usePublicClient, useWalletClient } from "wagmi";
 import { useModal } from "connectkit";
 import NavBar from "@/components/NavBar";
@@ -45,6 +45,8 @@ export default function CreateAuction() {
   const [bidderAddresses, setBidderAddresses] = useState<string[]>(Array(5).fill(""));
   const [invitedCount, setInvitedCount] = useState(0);
   const [invitedAddresses, setInvitedAddresses] = useState<string[]>([]);
+  const [failedInviteAddresses, setFailedInviteAddresses] = useState<string[]>([]);
+  const [inviteStatus, setInviteStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
 
   const meta = NEGOTIATION_TYPES[type];
   const publicClient = usePublicClient();
@@ -90,6 +92,8 @@ export default function CreateAuction() {
 
     setEncStatus("encrypting");
     setFHEStatus("encrypting");
+    setFailedInviteAddresses([]);
+    setInviteStatus("idle");
 
     const stepLabels: Record<string, string> = {
       InitTfhe: "Loading TFHE engine",
@@ -179,9 +183,10 @@ export default function CreateAuction() {
       if (uniqueAddresses.length > 0) {
         try {
           setEncryptStep("Syncing blockchain state…");
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 4000));
 
           setEncryptStep(`Sending batch invites to ${uniqueAddresses.length} bidders…`);
+          setInviteStatus("sending");
           const invHash = await walletClient.writeContract({
             address: MULTI_PARTY_AUCTION_ADDRESS,
             abi: MULTI_PARTY_AUCTION_ABI,
@@ -194,8 +199,12 @@ export default function CreateAuction() {
           await publicClient.waitForTransactionReceipt({ hash: invHash, confirmations: 1 });
           setInvitedCount(uniqueAddresses.length);
           setInvitedAddresses(uniqueAddresses);
+          setFailedInviteAddresses([]);
+          setInviteStatus("done");
         } catch (err: any) {
           console.error(`[CreateAuction] Batch invites failed:`, err);
+          setFailedInviteAddresses(uniqueAddresses);
+          setInviteStatus("error");
         }
       }
 
@@ -218,6 +227,33 @@ export default function CreateAuction() {
       setFHEStatus("idle");
       setEncStatus("idle");
       setEncryptStep("");
+    }
+  };
+
+  const sendInvitesManually = async () => {
+    if (!walletClient || !publicClient || failedInviteAddresses.length === 0 || !auctionId) return;
+    setInviteStatus("sending");
+    try {
+      const uniqueAddresses = failedInviteAddresses as `0x${string}`[];
+      const invHash = await walletClient.writeContract({
+        address: MULTI_PARTY_AUCTION_ADDRESS,
+        abi: MULTI_PARTY_AUCTION_ABI,
+        functionName: "sendBatchInvites",
+        args: [auctionId as `0x${string}`, uniqueAddresses],
+        chain: walletClient.chain,
+        account: walletClient.account,
+        gas: 500000n, // Bypass gas estimation failure
+      });
+      await publicClient.waitForTransactionReceipt({ hash: invHash, confirmations: 1 });
+      setInvitedCount(uniqueAddresses.length);
+      setInvitedAddresses(uniqueAddresses);
+      setFailedInviteAddresses([]);
+      setInviteStatus("done");
+    } catch (err: any) {
+      console.error("[CreateAuction] Manual batch invites failed:", err);
+      setInviteStatus("error");
+      const msg = err?.message || "";
+      alert(`Failed to send invites: ${msg.length > 200 ? msg.slice(0, 200) + "…" : msg}`);
     }
   };
 
@@ -736,6 +772,56 @@ export default function CreateAuction() {
             </div>
           </div>
 
+          {/* Failed invites retry section */}
+          {failedInviteAddresses.length > 0 && (
+            <div className="apple-card p-5 mb-4" style={{ borderColor: "rgba(255, 69, 58, 0.2)", background: "rgba(255, 69, 58, 0.03)" }}>
+              <div className="text-[11px] font-bold text-[#ff453a] uppercase tracking-wider mb-2.5 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-[#ff453a]" /> Invites Failed to Send
+              </div>
+              <p className="text-[12px] text-foreground/60 mb-4 leading-relaxed">
+                The auction was created successfully, but the invites could not be sent due to a temporary RPC rate limit. To invite these bidders so they can view the auction and submit their bids, please submit the invites transaction below:
+              </p>
+              <div className="space-y-1.5 mb-4 max-h-[120px] overflow-y-auto pr-1">
+                {failedInviteAddresses.map((addr, i) => (
+                  <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded bg-foreground/5 border border-foreground/5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#ff453a]/50"></span>
+                    <span className="text-[11px] text-foreground/60 font-mono flex-1 break-all">{addr}</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={sendInvitesManually}
+                disabled={inviteStatus === "sending"}
+                className="w-full py-3 rounded-lg text-[13px] font-semibold transition-all duration-200 flex items-center justify-center gap-2"
+                style={{
+                  background: inviteStatus === "sending" ? "rgba(255, 69, 58, 0.1)" : "rgba(255, 69, 58, 0.15)",
+                  color: "#ff453a",
+                  border: "1px solid rgba(255, 69, 58, 0.25)",
+                }}
+                onMouseEnter={(e) => {
+                  if (inviteStatus !== "sending") {
+                    e.currentTarget.style.background = "rgba(255, 69, 58, 0.25)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (inviteStatus !== "sending") {
+                    e.currentTarget.style.background = "rgba(255, 69, 58, 0.15)";
+                  }
+                }}
+              >
+                {inviteStatus === "sending" ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-[#ff453a]" /> Sending Invites…
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" /> Send Invites Now
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
           {/* Invited bidders summary */}
           {invitedAddresses.length > 0 && (
             <div className="apple-card p-4 mb-4">
@@ -771,6 +857,9 @@ export default function CreateAuction() {
             setAuctionConfirmed(false);
             setBidderAddresses(Array(maxBidders).fill(""));
             setInvitedCount(0);
+            setInvitedAddresses([]);
+            setFailedInviteAddresses([]);
+            setInviteStatus("idle");
           }}
             className="w-full text-center text-[13px] text-foreground/30 hover:text-foreground/50 transition-colors py-2">
             New Auction
