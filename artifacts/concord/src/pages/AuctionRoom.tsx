@@ -6,7 +6,7 @@ import { useAccount, usePublicClient, useWalletClient, useReadContract } from "w
 import { useModal } from "connectkit";
 import NavBar from "@/components/NavBar";
 import FHEBadge from "@/components/FHEBadge";
-import { getAuction, saveAuction, updateAuction, NEGOTIATION_TYPES, type Auction } from "@/lib/concord";
+import { getAuction, saveAuction, updateAuction, NEGOTIATION_TYPES, formatPrice, type Auction } from "@/lib/concord";
 import { encryptPrice, initFHE } from "@/lib/fhe";
 import { MULTI_PARTY_AUCTION_ABI, MULTI_PARTY_AUCTION_ADDRESS, auctionConfig, mapAuctionStatus, roomIdToCode } from "@/lib/contracts";
 
@@ -127,6 +127,10 @@ export default function AuctionRoom() {
     if (!bidPrice || !publicClient || !walletClient || !auction) return;
     const parsed = parseFloat(bidPrice);
     if (isNaN(parsed) || parsed <= 0) return;
+    if (auction.sellerPrice && parsed < auction.sellerPrice) {
+      alert(`Your bid must be at least ${formatPrice(auction.sellerPrice, auction.sellerPriceUnit || "")}.`);
+      return;
+    }
 
     setSubmitStatus("encrypting");
     setEncryptError("");
@@ -301,13 +305,24 @@ export default function AuctionRoom() {
 
           {/* Seller's floor */}
           <div className="apple-card p-4 mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Lock className="w-3.5 h-3.5 text-[#0a84ff]" />
-              <span className="text-[13px] font-semibold text-foreground">Seller's Floor Price</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Lock className="w-3.5 h-3.5 text-[#0a84ff]" />
+                <span className="text-[13px] font-semibold text-foreground">Seller's Floor Price</span>
+              </div>
+              {auction.sellerPrice && (
+                <span className="text-[14px] font-bold text-[#ff9500]">
+                  {formatPrice(auction.sellerPrice, auction.sellerPriceUnit || "")}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: "rgba(10,132,255,0.06)" }}>
               <ShieldCheck className="w-3 h-3 text-[#0a84ff]/50" />
-              <span className="text-[11px] text-[#0a84ff]/60">Encrypted on-chain — invisible to all bidders</span>
+              <span className="text-[11px] text-[#0a84ff]/60">
+                {auction.sellerPrice
+                  ? `Minimum bid requirement: Bids must be at least ${formatPrice(auction.sellerPrice, auction.sellerPriceUnit || "")}.`
+                  : "Encrypted on-chain — invisible to all bidders"}
+              </span>
             </div>
           </div>
 
@@ -346,8 +361,17 @@ export default function AuctionRoom() {
                 <div className="apple-card px-3 py-3 text-[13px] text-foreground/50 font-semibold flex items-center">{meta.unit || "USD"}</div>
               </div>
 
+              {auction.sellerPrice && bidPrice && parseFloat(bidPrice) < auction.sellerPrice && (
+                <div className="text-[12px] text-[#ff453a] mb-4 flex items-start gap-2 px-3 py-2.5 rounded-lg" style={{ background: "rgba(255, 69, 58, 0.08)", border: "1px solid rgba(255, 69, 58, 0.15)" }}>
+                  <AlertCircle className="w-4 h-4 text-[#ff453a] shrink-0 mt-0.5" />
+                  <span>
+                    Bid must be at least <strong>{formatPrice(auction.sellerPrice, auction.sellerPriceUnit || "")}</strong> (not less than {formatPrice(auction.sellerPrice, auction.sellerPriceUnit || "")}).
+                  </span>
+                </div>
+              )}
+
               {submitStatus === "idle" ? (
-                <button onClick={handleSubmitBid} disabled={!bidPrice || parseFloat(bidPrice) <= 0}
+                <button onClick={handleSubmitBid} disabled={!bidPrice || parseFloat(bidPrice) <= 0 || (!!auction.sellerPrice && parseFloat(bidPrice) < auction.sellerPrice)}
                   className="btn-apple w-full py-3 text-[14px] flex items-center justify-center gap-2 disabled:opacity-30">
                   <Lock className="w-4 h-4" /> Encrypt & Submit Bid
                 </button>
