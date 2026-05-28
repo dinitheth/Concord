@@ -49,11 +49,9 @@ export default function CreateRoom() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [roomConfirmed, setRoomConfirmed] = useState(false); // true once createRoom tx is mined
 
-  // Step 2 invite
   const [recipientInput, setRecipientInput] = useState("");
   const [xmtpState, setXmtpState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [xmtpError, setXmtpError] = useState("");
-  const [inviteRetryAt, setInviteRetryAt] = useState<number | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
 
   // Deal context
@@ -121,29 +119,6 @@ export default function CreateRoom() {
   const recipientAddrTrim = recipientInput.trim();
   const recipientAddrIsSelf = !!recipientAddrTrim && !!walletAddr && recipientAddrTrim.toLowerCase() === walletAddr.toLowerCase();
   const recipientAddrInvalid = !!recipientAddrTrim && (!isAddress(recipientAddrTrim) || recipientAddrIsSelf);
-  const inviteCooldownMs = 5 * 60 * 1000;
-  const inviteCooldownActive = !!inviteRetryAt && Date.now() < inviteRetryAt;
-  const inviteCooldownSeconds = inviteRetryAt ? Math.max(0, Math.ceil((inviteRetryAt - Date.now()) / 1000)) : 0;
-
-  React.useEffect(() => {
-    if (!walletAddr) return;
-    const lastInviteSentAt = Number(localStorage.getItem(`concord_last_invite_sent_at_${walletAddr.toLowerCase()}`) || "0");
-    if (lastInviteSentAt && Date.now() - lastInviteSentAt < inviteCooldownMs) {
-      setInviteRetryAt(lastInviteSentAt + inviteCooldownMs);
-    }
-  }, [walletAddr]);
-
-  React.useEffect(() => {
-    if (!inviteRetryAt) return;
-    const tick = window.setInterval(() => {
-      if (Date.now() >= inviteRetryAt) {
-        setInviteRetryAt(null);
-        setXmtpError("");
-        window.clearInterval(tick);
-      }
-    }, 1000);
-    return () => window.clearInterval(tick);
-  }, [inviteRetryAt]);
 
   // ── Eagerly connect FHE client when wallet connects ─────────────
   // connect() is lightweight (~100ms) — just registers chain + wallet.
@@ -285,10 +260,6 @@ export default function CreateRoom() {
       setXmtpState("error");
       return;
     }
-    if (inviteCooldownActive) {
-      setXmtpError(`On-chain invites are rate limited. Try again in ${inviteCooldownSeconds}s, or share the room code now.`);
-      return;
-    }
     if (!roomId || !roomId.startsWith("0x")) {
       setXmtpError("Room not created yet — please wait");
       return;
@@ -311,10 +282,6 @@ export default function CreateRoom() {
       });
       // Wait for confirmation
       await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
-      if (walletAddr) {
-        localStorage.setItem(`concord_last_invite_sent_at_${walletAddr.toLowerCase()}`, String(Date.now()));
-        setInviteRetryAt(Date.now() + inviteCooldownMs);
-      }
       setXmtpState("sent");
     } catch (err: any) {
       console.error("[SendInvite] Error:", err);
@@ -326,12 +293,6 @@ export default function CreateRoom() {
         setXmtpError("Only the room creator can send invites.");
       } else if (msg.includes("Cannot invite yourself")) {
         setXmtpError("You cannot invite your own wallet address.");
-      } else if (msg.toLowerCase().includes("rate limited")) {
-        if (walletAddr) {
-          localStorage.setItem(`concord_last_invite_sent_at_${walletAddr.toLowerCase()}`, String(Date.now()));
-        }
-        setInviteRetryAt(Date.now() + inviteCooldownMs);
-        setXmtpError("The contract is rate limiting on-chain invites for this wallet. Share the room code now, or try again in about 5 minutes.");
       } else {
         setXmtpError(msg.length > 80 ? `${msg.slice(0, 80)}...` : msg);
       }
@@ -999,16 +960,14 @@ export default function CreateRoom() {
                       )}
                       <button
                         onClick={sendInviteOnChain}
-                        disabled={!recipientInput.trim() || recipientAddrInvalid || xmtpState === "sending" || !roomConfirmed || inviteCooldownActive}
+                        disabled={!recipientInput.trim() || recipientAddrInvalid || xmtpState === "sending" || !roomConfirmed}
                         className="btn-apple"
-                        style={{ width: "100%", padding: "12px", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (!recipientInput.trim() || recipientAddrInvalid || !roomConfirmed || inviteCooldownActive) ? 0.35 : 1, cursor: (!recipientInput.trim() || recipientAddrInvalid || xmtpState === "sending" || !roomConfirmed || inviteCooldownActive) ? "not-allowed" : "pointer" }}
+                        style={{ width: "100%", padding: "12px", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (!recipientInput.trim() || recipientAddrInvalid || !roomConfirmed) ? 0.35 : 1, cursor: (!recipientInput.trim() || recipientAddrInvalid || xmtpState === "sending" || !roomConfirmed) ? "not-allowed" : "pointer" }}
                       >
                         {xmtpState === "sending" ? (
                           <><div style={{ width: 14, height: 14, border: "2px solid hsl(var(--muted-foreground))", borderTop: "2px solid white", borderRadius: "50%" }} className="animate-spin" />Sending — check your wallet…</>
                         ) : !roomConfirmed ? (
                           <>Confirming room on-chain…</>
-                        ) : inviteCooldownActive ? (
-                          <>Invite cooldown {inviteCooldownSeconds}s</>
                         ) : (
                           <><Send style={{ width: 13, height: 13 }} />Send On-Chain Invite</>
                         )}
