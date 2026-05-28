@@ -53,8 +53,14 @@ export default function DepositPage() {
 
   // Pre-fill seller address from saved room
   useEffect(() => {
-    if (room?.partyA?.address) setSellerAddress(room.partyA.address);
-  }, [roomId]);
+    if (!room) return;
+    if (room.creatorRole === "buyer") {
+      const seller = room.partyB?.address || room.notifyAddr || "";
+      setSellerAddress(seller);
+    } else {
+      if (room.partyA?.address) setSellerAddress(room.partyA.address);
+    }
+  }, [roomId, room?.partyB?.address, room?.partyA?.address, room?.notifyAddr, room?.creatorRole]);
 
   // Read USDC balance
   const { data: usdcBalance } = useReadContract({
@@ -270,7 +276,7 @@ export default function DepositPage() {
                   <span className="text-[12px] text-foreground/30 font-semibold">USDC</span>
                 </div>
                 <p className="text-[11px] text-foreground/30">
-                  This is the floor price you set during negotiation setup. It cannot be changed here.
+                  This is the {room?.creatorRole === "buyer" ? "ceiling" : "floor"} price you set during negotiation setup. It cannot be changed here.
                 </p>
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-[11px] text-foreground/25">Your USDC balance</span>

@@ -103,7 +103,9 @@ export default function ResultPage() {
       onChainInfo as [string, string, number, bigint, bigint, number, boolean, boolean, bigint];
 
     const localRoom = getRoom(id) || room;
-    const negKey = (["ma", "salary", "realestate", "custom"] as const)[negType] || "custom";
+    const creatorRole = negType >= 10 ? "buyer" : "seller";
+    const baseNegType = negType % 10;
+    const negKey = (["ma", "salary", "realestate", "custom"] as const)[baseNegType] || "custom";
     const zeroAddr = "0x0000000000000000000000000000000000000000";
 
     // Build the most complete room object from on-chain + local data
@@ -123,6 +125,7 @@ export default function ResultPage() {
       partyB: partyB !== zeroAddr
         ? { address: partyB, timestamp: localRoom?.partyB?.timestamp ?? Date.now() }
         : localRoom?.partyB,
+      creatorRole: localRoom?.creatorRole ?? creatorRole,
     };
 
     // Determine result
@@ -188,6 +191,16 @@ export default function ResultPage() {
   const agreedPrice = room.result?.agreedPrice;
   const txHash = room.result?.txHash || room.txHash;
   const displayPrice = agreedPrice ? `$${agreedPrice}${meta.unit}` : null;
+  const isViewerBuyer = !!address && !!room && (
+    room.creatorRole === "buyer"
+      ? room.partyA?.address?.toLowerCase() === address.toLowerCase()
+      : room.partyB?.address?.toLowerCase() === address.toLowerCase()
+  );
+  const isViewerSeller = !!address && !!room && (
+    room.creatorRole === "buyer"
+      ? room.partyB?.address?.toLowerCase() === address.toLowerCase()
+      : room.partyA?.address?.toLowerCase() === address.toLowerCase()
+  );
 
   const handleDecryptAndPublish = async () => {
     if (!publicClient || !walletClient) {
@@ -468,11 +481,11 @@ export default function ResultPage() {
                         {agreedPrice && (
                           <>
                             <div className="flex items-center justify-between">
-                              <span className="text-[13px] text-foreground/40">→ Seller receives</span>
+                              <span className="text-[13px] text-foreground/40">→ {isViewerSeller ? "You receive" : "Seller receives"}</span>
                               <span className="text-[13px] font-semibold text-[#30d158]">{agreedPrice} USDC</span>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className="text-[13px] text-foreground/40">→ Your refund</span>
+                              <span className="text-[13px] text-foreground/40">→ {isViewerBuyer ? "Your refund" : "Buyer refund"}</span>
                               <span className="text-[13px] font-semibold text-[#0a84ff]">
                                 {formatUsdc(escrow!.depositAmount - BigInt(agreedPrice) * 1_000_000n)} USDC
                               </span>
@@ -510,11 +523,11 @@ export default function ResultPage() {
                         <p className="text-[13px] font-semibold text-foreground">Settlement complete</p>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[13px] text-foreground/40">Seller received</span>
+                        <span className="text-[13px] text-foreground/40">{isViewerSeller ? "You received" : "Seller received"}</span>
                         <span className="text-[13px] font-semibold text-[#30d158]">{formatUsdc(escrow!.agreedAmount)} USDC</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[13px] text-foreground/40">Buyer refunded</span>
+                        <span className="text-[13px] text-foreground/40">{isViewerBuyer ? "You were refunded" : "Buyer refunded"}</span>
                         <span className="text-[13px] font-semibold text-[#0a84ff]">{formatUsdc(escrow!.depositAmount - escrow!.agreedAmount)} USDC</span>
                       </div>
                       {settleTxHash && (

@@ -84,7 +84,7 @@ contract BlindNegotiation {
     ) external {
         require(!roomExists[roomId], "Room already exists");
         require(deadline > block.timestamp, "Deadline must be in the future");
-        require(nType <= 3, "Invalid negotiation type");
+        require(nType <= 3 || (nType >= 10 && nType <= 13), "Invalid negotiation type");
 
         Room storage room = rooms[roomId];
 
@@ -169,7 +169,14 @@ contract BlindNegotiation {
         // ── CORE FHE COMPUTATION ─────────────────────────────────────
         //
         // Step 1: Is there a deal? (ceiling >= floor, fully in ciphertext)
-        ebool hasMatch = FHE.gte(room.partyBPrice, room.partyAPrice);
+        // If negotiationType < 10, Party A is Seller (Floor) and Party B is Buyer (Ceiling). Check: B >= A
+        // If negotiationType >= 10, Party A is Buyer (Ceiling) and Party B is Seller (Floor). Check: A >= B
+        ebool hasMatch;
+        if (room.negotiationType < 10) {
+            hasMatch = FHE.gte(room.partyBPrice, room.partyAPrice);
+        } else {
+            hasMatch = FHE.gte(room.partyAPrice, room.partyBPrice);
+        }
 
         // Step 2: Compute the midpoint in encrypted space
         euint64 encSum = FHE.add(room.partyAPrice, room.partyBPrice);

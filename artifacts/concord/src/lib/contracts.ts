@@ -10,8 +10,8 @@ import { baseSepolia } from "wagmi/chains";
 
 // ── Contract Addresses ──────────────────────────────────────────
 // Wave 4 deployment — Base Sepolia (Chain 84532)
-export const BLIND_NEGOTIATION_ADDRESS: Address  = "0xEB81D05a54068A662aD7aC62CF1Df91cD5e9DdE6";
-export const CONFIDENTIAL_ESCROW_ADDRESS: Address = "0x4B5c130ad2BD8A9CDfa062E2B9d7a655Db757F3A";
+export const BLIND_NEGOTIATION_ADDRESS: Address  = "0x5bFf8F92c44012B4B79271aE451159e4187f0d99";
+export const CONFIDENTIAL_ESCROW_ADDRESS: Address = "0x74f9344DA5d59f1a493efFDE7D9c175918D6fc57";
 
 // USDC on Base Sepolia
 export const USDC_ADDRESS: Address = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";

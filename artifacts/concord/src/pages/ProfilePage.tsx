@@ -106,7 +106,7 @@ export default function ProfilePage() {
       auctionReceivedRaw.forEach((inv: any) => {
         const exists = mergedAuctions.some(a => a.id.toLowerCase() === inv.auctionId.toLowerCase());
         if (!exists) {
-          const negKey = (["ma", "salary", "realestate", "custom"] as const)[inv.negotiationType] || "custom";
+          const negKey = (["ma", "salary", "realestate", "custom"] as const)[inv.negotiationType % 10] || "custom";
           mergedAuctions.push({
             id: inv.auctionId,
             auctionIdHex: inv.auctionId,
@@ -128,7 +128,7 @@ export default function ProfilePage() {
       auctionSentRaw.forEach((inv: any) => {
         const exists = mergedAuctions.some(a => a.id.toLowerCase() === inv.auctionId.toLowerCase());
         if (!exists) {
-          const negKey = (["ma", "salary", "realestate", "custom"] as const)[inv.negotiationType] || "custom";
+          const negKey = (["ma", "salary", "realestate", "custom"] as const)[inv.negotiationType % 10] || "custom";
           mergedAuctions.push({
             id: inv.auctionId,
             auctionIdHex: inv.auctionId,

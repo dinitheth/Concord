@@ -30,7 +30,7 @@ function timeLabel(ts: number) {
   return `${Math.round(diff / 60)}m ago`;
 }
 
-function FeedBubble({ event, index }: { event: FeedEventType; index: number }) {
+function FeedBubble({ event, index, creatorRole }: { event: FeedEventType; index: number; creatorRole?: "seller" | "buyer" }) {
   const isInitiator = event.kind === "initiator_submitted";
   const isCounterparty = event.kind === "counterparty_submitted";
 
@@ -48,7 +48,9 @@ function FeedBubble({ event, index }: { event: FeedEventType; index: number }) {
             <div className="rounded-2xl rounded-bl-md px-4 py-3" style={{ background: "hsl(var(--card))", border: "0.5px solid var(--card-border-color)" }}>
               <div className="flex items-center gap-2 mb-2">
                 <Lock className="w-3.5 h-3.5 text-[#0a84ff]" />
-                <span className="text-[13px] font-semibold text-foreground">Party A sealed their floor price</span>
+                <span className="text-[13px] font-semibold text-foreground">
+                  Party A sealed their {creatorRole === "buyer" ? "ceiling" : "floor"} price
+                </span>
               </div>
               <div className="font-mono text-[10px] text-[#0a84ff]/60 break-all leading-relaxed">{event.ciphertextPreview}</div>
               <div className="mt-2 text-[11px] text-foreground/25 flex items-center gap-1">
@@ -63,12 +65,14 @@ function FeedBubble({ event, index }: { event: FeedEventType; index: number }) {
 
       {isCounterparty && (
         <div className="max-w-[78%] flex items-end gap-2.5 flex-row-reverse">
-          <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[12px] font-bold bg-[rgba(90,200,250,0.12)] text-[#5ac8fa] border border-[rgba(90,200,250,0.2)] mb-0.5">B</div>
+          <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[12px] font-bold bg-[rgba(90,200,250,0.12)] text-[#5ac8fa] border border-[rgba(90,200,250,0.25)] mb-0.5">B</div>
           <div>
             <div className="rounded-2xl rounded-br-md px-4 py-3" style={{ background: "rgba(10,132,255,0.12)", border: "0.5px solid rgba(10,132,255,0.2)" }}>
               <div className="flex items-center gap-2 mb-2">
                 <Lock className="w-3.5 h-3.5 text-[#5ac8fa]" />
-                <span className="text-[13px] font-semibold text-foreground">Party B submitted their price</span>
+                <span className="text-[13px] font-semibold text-foreground">
+                  Party B submitted their {creatorRole === "buyer" ? "floor" : "ceiling"} price
+                </span>
               </div>
               <div className="font-mono text-[10px] text-[#5ac8fa]/60 break-all leading-relaxed">{event.ciphertextPreview}</div>
               <div className="mt-2 text-[11px] text-foreground/25 flex items-center gap-1">
@@ -189,7 +193,9 @@ export default function RoomPage() {
     // If on-chain data is available, always check for updates (counterparty joining)
     if (id.startsWith("0x") && onChainInfo) {
       const [partyA, partyB, status, createdAt, deadline, negType, isResultPublished, onChainMatched, onChainPrice] = onChainInfo as [string, string, number, bigint, bigint, number, boolean, boolean, bigint];
-      const negKey = NEG_TYPE_MAP[negType] ?? "custom";
+      const creatorRole = negType >= 10 ? "buyer" : "seller";
+      const baseNegType = negType % 10;
+      const negKey = NEG_TYPE_MAP[baseNegType] ?? "custom";
       const meta = NEGOTIATION_TYPES[negKey];
 
       // Map on-chain RoomStatus enum (0=Open, 1=PendingB, 2=Computing, 3=Settled, 4=Expired)
@@ -207,6 +213,7 @@ export default function RoomPage() {
         createdAt: r?.createdAt ?? Number(createdAt) * 1000,
         deadline: r?.deadline ?? Number(deadline) * 1000,
         txHash: r?.txHash,
+        creatorRole: r?.creatorRole ?? creatorRole,
         result: isResultPublished ? {
           matched: onChainMatched,
           agreedPrice: Number(onChainPrice) > 0 ? Number(onChainPrice) : undefined,
@@ -217,7 +224,8 @@ export default function RoomPage() {
 
       // Only update if something actually changed
       const hasNewPartyB = partyB !== zeroAddr && !r?.partyB;
-      if (hasNewPartyB || !r?.partyA) {
+      const hasNoCreatorRole = !r?.creatorRole;
+      if (hasNewPartyB || !r?.partyA || hasNoCreatorRole) {
         saveRoom(enrichedRoom);
       }
       setRoom(enrichedRoom);
@@ -494,7 +502,7 @@ export default function RoomPage() {
         <div className="flex-1 overflow-y-auto py-6 space-y-3 min-h-0" style={{ maxHeight: "calc(100vh - 340px)" }}>
           <AnimatePresence initial={false}>
             {feed.map((event, i) => (
-              <FeedBubble key={`${event.kind}-${i}`} event={event} index={i} />
+              <FeedBubble key={`${event.kind}-${i}`} event={event} index={i} creatorRole={room.creatorRole} />
             ))}
           </AnimatePresence>
           <div ref={feedEndRef} />
@@ -544,7 +552,9 @@ export default function RoomPage() {
 
           {!isSettled && room.partyA && !room.partyB && walletConnected && !isPartyA && submitStatus === "idle" && (
             <div className="space-y-3">
-              <div className="text-[12px] text-foreground/35 text-center">Enter your maximum price. It will be FHE-encrypted and submitted on-chain.</div>
+              <div className="text-[12px] text-foreground/35 text-center">
+                Enter your {room.creatorRole === "buyer" ? "minimum" : "maximum"} price. It will be FHE-encrypted and submitted on-chain.
+              </div>
               <div className="flex items-center gap-2">
                 <div className="flex-1 relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-foreground/35 text-[15px]">$</span>

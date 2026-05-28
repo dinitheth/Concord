@@ -89,7 +89,7 @@ function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: stri
           </div>
           <div>
             <div className="text-[13px] font-semibold text-foreground">
-              {inv.isAuction ? "🔨 Auction" : ""} {NEG_TYPE_LABELS[inv.negotiationType] ?? "Negotiation"} Invite
+              {inv.isAuction ? "🔨 Auction" : ""} {NEG_TYPE_LABELS[inv.negotiationType % 10] ?? "Negotiation"} Invite
             </div>
             {inv.isAuction && (
               <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: "rgba(255,149,0,0.12)", color: "#ff9500" }}>Sealed-Bid</span>
@@ -501,7 +501,7 @@ export default function InboxPage() {
                           </div>
                           <div>
                             <div className="text-[13px] font-semibold text-foreground">
-                              {NEG_TYPE_LABELS[inv.negotiationType] ?? "Negotiation"} — Invite Sent
+                              {NEG_TYPE_LABELS[inv.negotiationType % 10] ?? "Negotiation"} — Invite Sent
                             </div>
                             <div className="text-[11px] text-foreground/35 font-mono">encrypted on Base Sepolia</div>
                           </div>

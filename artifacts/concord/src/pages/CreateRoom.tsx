@@ -40,6 +40,7 @@ export default function CreateRoom() {
 
   // Core
   const [type, setType] = useState<NegotiationType>("ma");
+  const [creatorRole, setCreatorRole] = useState<"seller" | "buyer">("seller");
   const [price, setPrice] = useState("");
   const [priceUnit, setPriceUnit] = useState<PriceUnit>("M"); // M/K/B/USD
   const [encStatus, setEncStatus] = useState<"idle" | "encrypting" | "done">("idle");
@@ -95,6 +96,7 @@ export default function CreateRoom() {
     if (savedRoom.myPrice)       setPrice(String(savedRoom.myPrice));
     if (savedRoom.myPriceUnit)   setPriceUnit(savedRoom.myPriceUnit as PriceUnit);
     if (savedRoom.type)          setType(savedRoom.type as NegotiationType);
+    if (savedRoom.creatorRole)   setCreatorRole(savedRoom.creatorRole as "seller" | "buyer");
     if (savedRoom.dealName)      setDealName(savedRoom.dealName);
     if (savedRoom.dealDesc)      setDealDesc(savedRoom.dealDesc);
     if (savedRoom.selectedTerms) setSelectedTerms(savedRoom.selectedTerms);
@@ -184,6 +186,7 @@ export default function CreateRoom() {
 
       // 6. Map negotiation type to uint8
       const typeMap: Record<NegotiationType, number> = { ma: 0, salary: 1, realestate: 2, custom: 3 };
+      const nTypeVal = typeMap[type] + (creatorRole === "buyer" ? 10 : 0);
 
       // 7. Send on-chain transaction — use walletClient directly (viem) instead of
       //    wagmi's writeContractAsync which can go stale after the ~2min encryption.
@@ -192,7 +195,7 @@ export default function CreateRoom() {
         address: BLIND_NEGOTIATION_ADDRESS,
         abi: BLIND_NEGOTIATION_ABI,
         functionName: "createRoom",
-        args: [roomIdHex, encrypted.encryptedInput, typeMap[type], deadlineTs],
+        args: [roomIdHex, encrypted.encryptedInput, nTypeVal, deadlineTs],
         chain: walletClient.chain,
         account: walletClient.account,
       });
@@ -219,6 +222,7 @@ export default function CreateRoom() {
         createdAt: Date.now(),
         deadline: Number(deadlineTs) * 1000,
         txHash: hash,
+        creatorRole,
       });
       localStorage.setItem("concord_last_room", roomIdHex);
 
@@ -331,6 +335,7 @@ export default function CreateRoom() {
     setDeadline("");
     setDisplayName("");
     setNotifyXmtpAddr("");
+    setCreatorRole("seller");
     localStorage.removeItem("concord_last_room");
   };
 
@@ -407,6 +412,40 @@ export default function CreateRoom() {
                           {NEGOTIATION_TYPES[t].label}
                         </button>
                       ))}
+                    </div>
+
+                    <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.12em" }}>My Role in Negotiation</span>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => setCreatorRole("seller")}
+                          style={{
+                            flex: 1, padding: "10px 16px", borderRadius: 12, fontSize: 13, fontWeight: 500,
+                            cursor: "pointer", transition: "all 0.25s",
+                            background: creatorRole === "seller" ? "rgba(10,132,255,0.15)" : "hsl(var(--input))",
+                            color: creatorRole === "seller" ? "#0a84ff" : "hsl(var(--muted-foreground))",
+                            border: creatorRole === "seller" ? "1px solid rgba(10,132,255,0.4)" : "1px solid hsl(var(--border))",
+                            boxShadow: creatorRole === "seller" ? "0 0 15px rgba(10,132,255,0.1)" : "none",
+                          }}
+                        >
+                          Seller (Floor / min price)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCreatorRole("buyer")}
+                          style={{
+                            flex: 1, padding: "10px 16px", borderRadius: 12, fontSize: 13, fontWeight: 500,
+                            cursor: "pointer", transition: "all 0.25s",
+                            background: creatorRole === "buyer" ? "rgba(10,132,255,0.15)" : "hsl(var(--input))",
+                            color: creatorRole === "buyer" ? "#0a84ff" : "hsl(var(--muted-foreground))",
+                            border: creatorRole === "buyer" ? "1px solid rgba(10,132,255,0.4)" : "1px solid hsl(var(--border))",
+                            boxShadow: creatorRole === "buyer" ? "0 0 15px rgba(10,132,255,0.1)" : "none",
+                          }}
+                        >
+                          Buyer (Ceiling / max price)
+                        </button>
+                      </div>
                     </div>
 
 
@@ -670,7 +709,7 @@ export default function CreateRoom() {
                         <div style={{ position: "absolute", inset: -16, background: "rgba(34,211,238,0.03)", filter: "blur(20px)", borderRadius: "50%", pointerEvents: "none" }} />
 
                         <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "hsl(var(--foreground))", opacity: 0.7, marginBottom: 8, position: "relative" }}>
-                          {meta.partyALabel}
+                          {creatorRole === "seller" ? meta.partyALabel : meta.partyBLabel}
                         </label>
                         <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
                           <span style={{ position: "absolute", left: 16, fontSize: 24, color: "hsl(var(--muted-foreground))", zIndex: 2 }}>$</span>
@@ -854,8 +893,12 @@ export default function CreateRoom() {
                     <ShieldCheck style={{ width: 18, height: 18, color: "#30d158" }} strokeWidth={1.75} />
                   </motion.div>
                   <div>
-                    <h2 className="sf-display" style={{ fontSize: 20, color: "hsl(var(--foreground))", lineHeight: 1.2, margin: 0 }}>Floor locked</h2>
-                    <p style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", margin: 0 }}>Your floor price is securely encrypted on-chain. Invite your counterparty to begin.</p>
+                    <h2 className="sf-display" style={{ fontSize: 20, color: "hsl(var(--foreground))", lineHeight: 1.2, margin: 0 }}>
+                      {creatorRole === "seller" ? "Floor locked" : "Ceiling locked"}
+                    </h2>
+                    <p style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", margin: 0 }}>
+                      Your {creatorRole === "seller" ? "floor" : "ceiling"} price is securely encrypted on-chain. Invite your counterparty to begin.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -926,13 +969,13 @@ export default function CreateRoom() {
                 <div>
                   {/* Encrypted floor confirmation */}
                   <div style={LABEL_STYLE}>
-                    Floor Price
+                    {creatorRole === "seller" ? "Floor Price" : "Ceiling Price"}
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "rgba(48,209,88,0.12)", color: "#30d158", border: "1px solid rgba(48,209,88,0.22)", marginLeft: "auto" }}>Encrypted</span>
                   </div>
                   <div style={{ padding: "14px", borderRadius: 12, background: "rgba(48,209,88,0.04)", border: "1px solid rgba(48,209,88,0.14)", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
                     <Lock style={{ width: 16, height: 16, color: "#30d158", flexShrink: 0 }} />
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#30d158" }}>Floor price securely encrypted</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#30d158" }}>{creatorRole === "seller" ? "Floor" : "Ceiling"} price securely encrypted</div>
                       <div style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", marginTop: 2 }}>Stored on-chain as FHE ciphertext — invisible to everyone</div>
                     </div>
                   </div>
@@ -1143,8 +1186,12 @@ export default function CreateRoom() {
 
                 {/* Floor price */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 12, background: "rgba(10,132,255,0.06)", border: "1px solid rgba(10,132,255,0.18)" }}>
-                  <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Floor Price (will be encrypted)</span>
-                  <span style={{ fontSize: 20, fontWeight: 800, color: "hsl(var(--foreground))", fontFamily: "monospace" }}>${price} <span style={{ fontSize: 12, fontWeight: 500, color: "hsl(var(--muted-foreground))" }}>USD</span></span>
+                  <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>
+                    {creatorRole === "seller" ? "Floor Price" : "Ceiling Price"} (will be encrypted)
+                  </span>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: "hsl(var(--foreground))", fontFamily: "monospace" }}>
+                    ${price} <span style={{ fontSize: 12, fontWeight: 500, color: "hsl(var(--muted-foreground))" }}>{priceUnit === "USD" ? "USD" : `${priceUnit} USD`}</span>
+                  </span>
                 </div>
 
                 {/* Counterparty address */}

@@ -38,6 +38,7 @@ export interface Room {
   createdAt: number;
   deadline: number;
   txHash?: string; // Creation tx hash
+  creatorRole?: "seller" | "buyer";
 }
 
 // ── Wave 5: Auction Interface ───────────────────────────────────
@@ -282,7 +283,7 @@ export function shortAddress(addr: string): string {
 
 // ── Contract Constants ──────────────────────────────────────────
 
-export const CONCORD_CONTRACT_ADDRESS = "0xEB81D05a54068A662aD7aC62CF1Df91cD5e9DdE6";
+export const CONCORD_CONTRACT_ADDRESS = "0x5bFf8F92c44012B4B79271aE451159e4187f0d99";
 export const CONCORD_AUCTION_ADDRESS = "0xe0A48263eeEa990Dd73CE9477Ef776f5D29a4c60";
 export const CONCORD_NETWORK = "Base Sepolia";
 export const CONCORD_CHAIN_ID = 84532;
