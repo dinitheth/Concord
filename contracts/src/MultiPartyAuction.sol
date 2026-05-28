@@ -268,7 +268,9 @@ contract MultiPartyAuction {
         bool _matched,
         uint64 _agreedPrice,
         address _winner
-    ) external onlyParticipant(auctionId) {
+    ) external {
+        require(auctionExists[auctionId], "Auction does not exist");
+        require(auctions[auctionId].seller == msg.sender, "Only seller can publish result");
         require(auctions[auctionId].status == AuctionStatus.Settled, "Not settled");
         require(!resultPublished[auctionId], "Already published");
 

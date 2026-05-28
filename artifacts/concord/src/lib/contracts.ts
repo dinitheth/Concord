@@ -10,8 +10,8 @@ import { baseSepolia } from "wagmi/chains";
 
 // ── Contract Addresses ──────────────────────────────────────────
 // Wave 4 deployment — Base Sepolia (Chain 84532)
-export const BLIND_NEGOTIATION_ADDRESS: Address  = "0x5bFf8F92c44012B4B79271aE451159e4187f0d99";
-export const CONFIDENTIAL_ESCROW_ADDRESS: Address = "0x74f9344DA5d59f1a493efFDE7D9c175918D6fc57";
+export const BLIND_NEGOTIATION_ADDRESS: Address  = "0x22F29DE6B4894970a8D929f5536Bb1132A15dec1";
+export const CONFIDENTIAL_ESCROW_ADDRESS: Address = "0x305a0d88419F3f7024e5f661b977D9F12fd398EC";
 
 // USDC on Base Sepolia
 export const USDC_ADDRESS: Address = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -549,7 +549,7 @@ export function mapOnChainStatus(status: number): "open" | "pending_b" | "comput
 
 // ── Wave 5: Multi-Party Auction ─────────────────────────────────
 
-export const MULTI_PARTY_AUCTION_ADDRESS: Address = "0xe0A48263eeEa990Dd73CE9477Ef776f5D29a4c60";
+export const MULTI_PARTY_AUCTION_ADDRESS: Address = "0x843b013bb104e416EeA8C8cC00C377B095A1c592";
 
 export const MULTI_PARTY_AUCTION_ABI = [
   // createAuction

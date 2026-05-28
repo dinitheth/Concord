@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import "forge-std/Script.sol";
 import "../src/BlindNegotiation.sol";
 import "../src/ConfidentialEscrow.sol";
+import "../src/MultiPartyAuction.sol";
 
 contract DeployAll is Script {
     // USDC on Base Sepolia
@@ -22,6 +23,10 @@ contract DeployAll is Script {
             address(negotiation)
         );
         console.log("ConfidentialEscrow deployed at:", address(escrow));
+
+        // 3. Deploy MultiPartyAuction
+        MultiPartyAuction auction = new MultiPartyAuction();
+        console.log("MultiPartyAuction deployed at:", address(auction));
 
         console.log("Chain ID:", block.chainid);
         console.log("USDC address:", USDC_BASE_SEPOLIA);

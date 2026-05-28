@@ -120,6 +120,10 @@ export default function AuctionResult() {
   const isParticipant = isSeller || isBidder;
 
   const handleDecryptAndPublish = async () => {
+    if (!isSeller) {
+      setDecryptError("Only the auction creator can decrypt and publish the result.");
+      return;
+    }
     if (!publicClient || !walletClient || !address) {
       setDecryptError("Connect your wallet first.");
       return;
@@ -195,25 +199,35 @@ export default function AuctionResult() {
 
               {/* Encrypted — needs decrypt */}
               {isEncrypted && !matched && !agreedPrice && (
-                <div className="apple-card p-6 text-center mb-6" style={{ borderColor: "rgba(120,80,255,0.3)" }}>
-                  <Lock className="w-10 h-10 text-[#a78bfa] mx-auto mb-3" />
-                  <h3 className="text-[16px] font-bold text-foreground mb-2">Result Encrypted</h3>
-                  <p className="text-[13px] text-foreground/40 mb-4">
-                    The FHE tournament is complete. Decrypt and publish the result to reveal the winner.
-                  </p>
-                  {decryptError && (
-                    <div className="text-[12px] text-red-400 mb-3 px-3 py-2 rounded-lg bg-red-400/5">{decryptError}</div>
-                  )}
-                  <button onClick={handleDecryptAndPublish}
-                    disabled={decrypting || isPublishing || isPublishLoading}
-                    className="btn-apple px-6 py-3 text-[14px] inline-flex items-center gap-2 disabled:opacity-40">
-                    {decrypting || isPublishing || isPublishLoading ? (
-                      <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Decrypting…</>
-                    ) : (
-                      <><Unlock className="w-4 h-4" /> Decrypt & Publish</>
+                isSeller ? (
+                  <div className="apple-card p-6 text-center mb-6" style={{ borderColor: "rgba(120,80,255,0.3)" }}>
+                    <Lock className="w-10 h-10 text-[#a78bfa] mx-auto mb-3" />
+                    <h3 className="text-[16px] font-bold text-foreground mb-2">Result Encrypted</h3>
+                    <p className="text-[13px] text-foreground/40 mb-4">
+                      The FHE tournament is complete. Decrypt and publish the result to reveal the winner.
+                    </p>
+                    {decryptError && (
+                      <div className="text-[12px] text-red-400 mb-3 px-3 py-2 rounded-lg bg-red-400/5">{decryptError}</div>
                     )}
-                  </button>
-                </div>
+                    <button onClick={handleDecryptAndPublish}
+                      disabled={decrypting || isPublishing || isPublishLoading}
+                      className="btn-apple px-6 py-3 text-[14px] inline-flex items-center gap-2 disabled:opacity-40">
+                      {decrypting || isPublishing || isPublishLoading ? (
+                        <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Decrypting…</>
+                      ) : (
+                        <><Unlock className="w-4 h-4" /> Decrypt & Publish</>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="apple-card p-6 text-center mb-6" style={{ borderColor: "rgba(120,80,255,0.15)" }}>
+                    <Lock className="w-10 h-10 text-[#a78bfa]/50 mx-auto mb-3 animate-pulse" />
+                    <h3 className="text-[16px] font-bold text-foreground mb-2">FHE Tournament Complete</h3>
+                    <p className="text-[13px] text-foreground/40 leading-relaxed max-w-sm mx-auto">
+                      The encrypted computations are finished. Waiting for the auction creator (seller) to decrypt and publish the results to reveal the winner.
+                    </p>
+                  </div>
+                )
               )}
 
               {/* Match found — winner! */}
