@@ -180,6 +180,9 @@ export default function RoomPage() {
 
   useEffect(() => {
     if (!id) return;
+    if (localStorage.getItem("concord_last_room") === id) {
+      localStorage.removeItem("concord_last_room");
+    }
     const r = getRoom(id);
     const zeroAddr = "0x0000000000000000000000000000000000000000";
 

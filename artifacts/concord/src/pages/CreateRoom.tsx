@@ -89,7 +89,10 @@ export default function CreateRoom() {
     const lastRoomId = localStorage.getItem("concord_last_room");
     if (!lastRoomId || encStatus !== "idle") return;
     const savedRoom = getRoom(lastRoomId);
-    if (!savedRoom) return;
+    if (!savedRoom || savedRoom.status === "settled" || savedRoom.status === "expired") {
+      localStorage.removeItem("concord_last_room");
+      return;
+    }
     setRoomId(lastRoomId);
     if (savedRoom.myPrice)       setPrice(String(savedRoom.myPrice));
     if (savedRoom.myPriceUnit)   setPriceUnit(savedRoom.myPriceUnit as PriceUnit);
@@ -100,7 +103,10 @@ export default function CreateRoom() {
     if (savedRoom.deadlineStr)   setDeadline(savedRoom.deadlineStr);
     if (savedRoom.displayName)   setDisplayName(savedRoom.displayName);
     if (savedRoom.notifyAddr)    setNotifyXmtpAddr(savedRoom.notifyAddr);
-    if (savedRoom.txHash)        setTxHash(savedRoom.txHash);
+    if (savedRoom.txHash) {
+      setTxHash(savedRoom.txHash);
+      setRoomConfirmed(true);
+    }
     setEncStatus("done");
   }, []);
 
@@ -1031,7 +1037,10 @@ export default function CreateRoom() {
                   <button onClick={copyCode} className="btn-ghost" style={{ width: "100%", padding: "12px", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
                     {codeCopied ? <><Check style={{ width: 14, height: 14 }} />Room Code Copied</> : <><Copy style={{ width: 14, height: 14 }} />Copy Room Code</>}
                   </button>
-                  <button onClick={() => navigate(`/room/${roomId}`)} className="btn-apple" style={{ width: "100%", padding: "13px", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
+                   <button onClick={() => {
+                    localStorage.removeItem("concord_last_room");
+                    navigate(`/room/${roomId}`);
+                  }} className="btn-apple" style={{ width: "100%", padding: "13px", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
                     Open Room <ArrowRight style={{ width: 15, height: 15 }} />
                   </button>
                   <button onClick={handleReset} className="btn-ghost" style={{ width: "100%", padding: "12px", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
