@@ -398,45 +398,23 @@ export default function RoomPage() {
           await new Promise(r => setTimeout(r, 3000));
           continue;
         }
-        // All attempts failed — fall back to demo mode
-        console.log("[RoomPage] All FHE attempts failed. Using demo mode.");
-        handleDemoFallback();
+        // All attempts failed — show error and let user retry
+        console.error("[RoomPage] All FHE attempts failed:", err?.message);
+        const msg = err?.shortMessage ?? err?.message ?? "Encryption failed";
+        const isModuleErr = msg.includes("dynamically imported module") || msg.includes("Failed to fetch") || msg.includes("preload") || msg.includes("MIME type");
+        setEncryptError(
+          isModuleErr
+            ? "A new version of Concord was deployed or encryption modules failed to load. Please reload the page to get the latest update."
+            : msg.includes("timed out")
+            ? "FHE encryption timed out. The CoFHE network may be congested. Please try again."
+            : msg.includes("User rejected") || msg.includes("user rejected")
+            ? "Transaction was rejected in your wallet."
+            : `Encryption failed: ${msg.length > 100 ? msg.slice(0, 100) + "…" : msg}`
+        );
+        setSubmitStatus("error");
         return;
       }
     }
-  };
-
-  /** Demo fallback: simulates FHE flow locally when CoFHE testnet is unreachable */
-  const handleDemoFallback = () => {
-    if (!room) return;
-    setSubmitStatus("computing");
-    setEncryptStep("Demo mode: simulating encrypted comparison");
-
-    setTimeout(() => {
-      setFeed(prev => [...prev.filter(e => e.kind !== "waiting_counterparty"),
-        { kind: "counterparty_submitted", ciphertextPreview: "demo: encrypted locally", ts: Date.now() },
-      ]);
-
-      const updatedRoom: Room = {
-        ...room,
-        partyB: { address: walletAddr!, timestamp: Date.now() },
-        myPrice: Number(parsedPrice),
-        myPriceUnit: priceUnit,
-        status: "settled",
-        result: { matched: true, timestamp: Date.now(), txHash: "demo-mode" },
-      };
-      saveRoom(updatedRoom);
-      setRoom(updatedRoom);
-
-      setFeed(prev => [...prev, {
-        kind: "result_matched",
-        agreedPrice: "Demo: comparison complete. Loading results…",
-        ts: Date.now(),
-      }]);
-
-      setSubmitStatus("done");
-      setTimeout(() => navigate(`/result/${id}`), 2000);
-    }, 2000);
   };
 
   if (notFound) {
@@ -624,13 +602,23 @@ export default function RoomPage() {
           {submitStatus === "error" && (
             <div className="flex flex-col items-center gap-2.5 py-4">
               <div className="text-[13px] text-[#ff453a]/80 text-center max-w-sm">{encryptError}</div>
-              <button
-                onClick={() => { setSubmitStatus("idle"); setEncryptError(""); }}
-                className="btn-apple px-5 py-2.5 text-[13px] flex items-center gap-2"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Retry
-              </button>
+              {encryptError.includes("Reload") || encryptError.includes("dynamic") || encryptError.includes("module") ? (
+                <button
+                  onClick={() => window.location.reload()}
+                  className="btn-apple px-5 py-2.5 text-[13px] flex items-center gap-2"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Reload Page
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setSubmitStatus("idle"); setEncryptError(""); }}
+                  className="btn-apple px-5 py-2.5 text-[13px] flex items-center gap-2"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Retry
+                </button>
+              )}
             </div>
           )}
         </div>

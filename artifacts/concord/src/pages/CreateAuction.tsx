@@ -202,9 +202,17 @@ export default function CreateAuction() {
       setEncryptStep("");
     } catch (error: any) {
       console.error("[CreateAuction] Error:", error);
-      if (error?.message?.includes("User rejected")) { /* silent */ }
-      else if (error?.message?.includes("ProviderNotFound")) {
-        alert("Wallet connection lost. Reconnect and try again.");
+      const msg = error?.message || "";
+      const isModuleErr = msg.includes("dynamically imported module") || msg.includes("Failed to fetch") || msg.includes("preload") || msg.includes("MIME type");
+      if (isModuleErr) {
+        alert("A new version of Concord was deployed or encryption modules failed to load. The page will reload to load the latest encryption modules.");
+        window.location.reload();
+      } else if (error?.message?.includes("ProviderNotFound") || error?.message?.includes("Provider not found")) {
+        alert("Wallet connection was lost during encryption. Please reconnect your wallet and try again.");
+      } else if (error?.message?.includes("User rejected") || error?.message?.includes("user rejected")) {
+        // User cancelled the tx in their wallet — just reset silently
+      } else {
+        alert(`Encryption or auction creation failed: ${msg.length > 200 ? msg.slice(0, 200) + "…" : msg}`);
       }
       setFHEStatus("idle");
       setEncStatus("idle");

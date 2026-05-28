@@ -1,3 +1,19 @@
+// Handle dynamic import / chunk load errors (e.g. after a new deployment)
+if (typeof window !== "undefined") {
+  window.addEventListener("vite:preloadError", (event) => {
+    console.warn("[Vite] Preload error detected, reloading page...", event);
+    event.preventDefault();
+    const lastReload = window.sessionStorage.getItem("vite-preload-error-reload");
+    const now = Date.now();
+    if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+      window.sessionStorage.setItem("vite-preload-error-reload", now.toString());
+      window.location.reload();
+    } else {
+      console.error("[Vite] Preload error recurred within 10s. Stopping automatic reload.");
+    }
+  });
+}
+
 import { createRoot } from "react-dom/client";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

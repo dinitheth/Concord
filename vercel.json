@@ -4,7 +4,7 @@
   "installCommand": "pnpm install",
   "framework": "vite",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|tfhe_bg.wasm|favicon.svg|opengraph.jpg).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

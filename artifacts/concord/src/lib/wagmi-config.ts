@@ -56,7 +56,7 @@ export const wagmiConfig = createConfig(
         http("https://base-sepolia.blockpi.network/v1/rpc/public"),
       ]),
       [mainnet.id]: fallback([
-        http("https://eth.llamarpc.com"),
+        http("https://cloudflare-eth.com"),
         http("https://ethereum-rpc.publicnode.com"),
       ]),
     },

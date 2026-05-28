@@ -32,8 +32,9 @@ export default function AuctionRoom() {
 
   const [auction, setAuction] = useState<Auction | null>(null);
   const [bidPrice, setBidPrice] = useState("");
-  const [submitStatus, setSubmitStatus] = useState<"idle" | "encrypting" | "computing" | "done">("idle");
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "encrypting" | "computing" | "done" | "error">("idle");
   const [encryptStep, setEncryptStep] = useState("");
+  const [encryptError, setEncryptError] = useState("");
   const [computeStatus, setComputeStatus] = useState<"idle" | "computing" | "done">("idle");
   const [timeDisplay, setTimeDisplay] = useState("");
 
@@ -128,6 +129,7 @@ export default function AuctionRoom() {
     if (isNaN(parsed) || parsed <= 0) return;
 
     setSubmitStatus("encrypting");
+    setEncryptError("");
     const stepLabels: Record<string, string> = {
       InitTfhe: "Loading TFHE engine", FetchKeys: "Fetching FHE keys",
       Pack: "Packing encrypted input", Prove: "Generating ZK proof", Verify: "Verifying with CoFHE",
@@ -166,8 +168,19 @@ export default function AuctionRoom() {
         return;
       } catch (err: any) {
         if (attempt >= MAX_ATTEMPTS) {
-          setEncryptStep("All attempts failed");
-          setSubmitStatus("idle");
+          console.error("[AuctionRoom] All FHE attempts failed:", err?.message);
+          const msg = err?.shortMessage ?? err?.message ?? "Encryption failed";
+          const isModuleErr = msg.includes("dynamically imported module") || msg.includes("Failed to fetch") || msg.includes("preload") || msg.includes("MIME type");
+          setEncryptError(
+            isModuleErr
+              ? "A new version of Concord was deployed or encryption modules failed to load. Please reload the page to get the latest update."
+              : msg.includes("timed out")
+              ? "FHE encryption timed out. The CoFHE network may be congested. Please try again."
+              : msg.includes("User rejected") || msg.includes("user rejected")
+              ? "Transaction was rejected in your wallet."
+              : `Encryption failed: ${msg.length > 100 ? msg.slice(0, 100) + "…" : msg}`
+          );
+          setSubmitStatus("error");
         } else {
           setEncryptStep(`Attempt ${attempt} failed. Retrying…`);
           await new Promise(r => setTimeout(r, 3000));
@@ -341,6 +354,27 @@ export default function AuctionRoom() {
               ) : submitStatus === "done" ? (
                 <div className="flex items-center justify-center gap-2 py-3 text-[#30d158]">
                   <CheckCircle2 className="w-5 h-5" /> <span className="text-[14px] font-semibold">Bid Submitted!</span>
+                </div>
+              ) : submitStatus === "error" ? (
+                <div className="flex flex-col items-center gap-2.5 py-3">
+                  <div className="text-[13px] text-[#ff453a]/80 text-center max-w-sm">{encryptError}</div>
+                  {encryptError.includes("Reload") || encryptError.includes("dynamic") || encryptError.includes("module") ? (
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="btn-apple px-5 py-2.5 text-[13px] flex items-center gap-2 w-full justify-center"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Reload Page
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { setSubmitStatus("idle"); setEncryptError(""); }}
+                      className="btn-apple px-5 py-2.5 text-[13px] flex items-center gap-2 w-full justify-center"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Retry
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center justify-center gap-3 py-3">

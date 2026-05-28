@@ -234,13 +234,19 @@ export default function CreateRoom() {
       setEncryptStep("");
     } catch (error: any) {
       console.error("[CreateRoom] Error:", error);
-      // Show user-friendly error for common failures
-      if (error?.message?.includes("ProviderNotFound") || error?.message?.includes("Provider not found")) {
+      const msg = error?.message || "";
+      const isModuleErr = msg.includes("dynamically imported module") || msg.includes("Failed to fetch") || msg.includes("preload") || msg.includes("MIME type");
+      if (isModuleErr) {
+        alert("A new version of Concord was deployed or encryption modules failed to load. The page will reload to load the latest encryption modules.");
+        window.location.reload();
+      } else if (error?.message?.includes("ProviderNotFound") || error?.message?.includes("Provider not found")) {
         alert("Wallet connection was lost during encryption. Please reconnect your wallet and try again.");
       } else if (error?.message?.includes("User rejected") || error?.message?.includes("user rejected")) {
         // User cancelled the tx in their wallet — just reset silently
       } else if (error?.message?.includes("ZK_VERIFY_FAILED")) {
         alert("FHE proof verification failed. This may be a temporary network issue. Please try again.");
+      } else {
+        alert(`Encryption or room creation failed: ${msg.length > 200 ? msg.slice(0, 200) + "…" : msg}`);
       }
       setFHEStatus("idle");
       setEncStatus("idle");
