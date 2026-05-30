@@ -43,8 +43,9 @@ contract BlindNegotiation {
     }
 
     mapping(bytes32 => Room) private rooms;
-    bytes32[] public roomIds;
     mapping(bytes32 => bool) public roomExists;
+    mapping(bytes32 => string) public roomMetadata;
+    bytes32[] public roomIds;
 
     // Result publication storage
     mapping(bytes32 => bool) public resultPublished;
@@ -75,12 +76,14 @@ contract BlindNegotiation {
      * @param encFloor  InEuint64 — encrypted floor price
      * @param nType     Negotiation type (0=M&A, 1=Salary, 2=RealEstate, 3=Custom)
      * @param deadline  Unix timestamp after which room expires
+     * @param metadata  Plaintext JSON string of deal details (no price)
      */
     function createRoom(
         bytes32 roomId,
         InEuint64 calldata encFloor,
         uint8 nType,
-        uint256 deadline
+        uint256 deadline,
+        string calldata metadata
     ) external {
         require(!roomExists[roomId], "Room already exists");
         require(deadline > block.timestamp, "Deadline must be in the future");
@@ -100,6 +103,7 @@ contract BlindNegotiation {
         room.createdAt = block.timestamp;
         room.deadline = deadline;
         room.negotiationType = nType;
+        roomMetadata[roomId] = metadata;
 
         roomIds.push(roomId);
         roomExists[roomId] = true;

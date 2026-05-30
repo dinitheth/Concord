@@ -10,8 +10,8 @@ import { baseSepolia } from "wagmi/chains";
 
 // ── Contract Addresses ──────────────────────────────────────────
 // Wave 4 deployment — Base Sepolia (Chain 84532)
-export const BLIND_NEGOTIATION_ADDRESS: Address  = "0x78309D8fE023142AE64D36A3dC552A158A137A00";
-export const CONFIDENTIAL_ESCROW_ADDRESS: Address = "0xe9e877d5C111d91FAe6758a1AccFFDf1d333F1B0";
+export const BLIND_NEGOTIATION_ADDRESS: Address  = "0x46BC52321a0B3C886Fccc2db88142727E44D3B7D";
+export const CONFIDENTIAL_ESCROW_ADDRESS: Address = "0x1f818B5483C91CF0D1741bCe53A6EaE8FF617B1c";
 
 // USDC on Base Sepolia
 export const USDC_ADDRESS: Address = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -32,6 +32,7 @@ export const BLIND_NEGOTIATION_ABI = [
       ]},
       { name: "nType", type: "uint8" },
       { name: "deadline", type: "uint256" },
+      { name: "metadata", type: "string" },
     ],
     outputs: [],
     stateMutability: "nonpayable",
@@ -282,6 +283,14 @@ export const BLIND_NEGOTIATION_ABI = [
       { name: "matched", type: "bool" },
       { name: "agreedPrice", type: "uint64" },
     ],
+    stateMutability: "view",
+  },
+  // roomMetadata
+  {
+    type: "function",
+    name: "roomMetadata",
+    inputs: [{ name: "", type: "bytes32" }],
+    outputs: [{ name: "", type: "string" }],
     stateMutability: "view",
   },
 ] as const;
@@ -604,7 +613,7 @@ export function mapOnChainStatus(status: number): "open" | "pending_b" | "comput
 
 // ── Wave 5: Multi-Party Auction ─────────────────────────────────
 
-export const MULTI_PARTY_AUCTION_ADDRESS: Address = "0xF0c16bAFb7EF0E6Cd6266EE7D46Eb4B3Dd6D5FF7";
+export const MULTI_PARTY_AUCTION_ADDRESS: Address = "0xE21E40C8c96e22f019De2d982428a0D782cb6136";
 
 export const MULTI_PARTY_AUCTION_ABI = [
   // createAuction

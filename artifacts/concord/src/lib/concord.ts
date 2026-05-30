@@ -39,6 +39,7 @@ export interface Room {
   deadline: number;
   txHash?: string; // Creation tx hash
   creatorRole?: "seller" | "buyer";
+  dashboardData?: Record<string, string>;
 }
 
 // ── Wave 5: Auction Interface ───────────────────────────────────

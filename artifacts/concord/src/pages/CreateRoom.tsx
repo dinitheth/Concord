@@ -59,6 +59,7 @@ export default function CreateRoom() {
   const [dealName, setDealName] = useState("");
   const [dealDesc, setDealDesc] = useState("");
   const [selectedTerms, setSelectedTerms] = useState<string[]>([]);
+  const [dashboardData, setDashboardData] = useState<Record<string, string>>({});
 
   // Deadline
   const [deadline, setDeadline] = useState("");
@@ -103,6 +104,7 @@ export default function CreateRoom() {
     if (savedRoom.deadlineStr)   setDeadline(savedRoom.deadlineStr);
     if (savedRoom.displayName)   setDisplayName(savedRoom.displayName);
     if (savedRoom.notifyAddr)    setNotifyXmtpAddr(savedRoom.notifyAddr);
+    if (savedRoom.dashboardData)  setDashboardData(savedRoom.dashboardData);
     if (savedRoom.txHash) {
       setTxHash(savedRoom.txHash);
       setRoomConfirmed(true);
@@ -188,6 +190,20 @@ export default function CreateRoom() {
       const typeMap: Record<NegotiationType, number> = { ma: 0, salary: 1, realestate: 2, custom: 3 };
       const nTypeVal = typeMap[type] + (creatorRole === "buyer" ? 10 : 0);
 
+      const metadata = JSON.stringify({
+        type,
+        label: meta.label,
+        dealName,
+        dealDesc,
+        selectedTerms,
+        deadline,
+        timezone,
+        displayName,
+        dashboardData,
+        dashboardFields: meta.dashboardFields,
+        creatorRole,
+      });
+
       // 7. Send on-chain transaction — use walletClient directly (viem) instead of
       //    wagmi's writeContractAsync which can go stale after the ~2min encryption.
       setEncryptStep("Sending transaction…");
@@ -195,7 +211,7 @@ export default function CreateRoom() {
         address: BLIND_NEGOTIATION_ADDRESS,
         abi: BLIND_NEGOTIATION_ABI,
         functionName: "createRoom",
-        args: [roomIdHex, encrypted.encryptedInput, nTypeVal, deadlineTs],
+        args: [roomIdHex, encrypted.encryptedInput, nTypeVal, deadlineTs, metadata],
         chain: walletClient.chain,
         account: walletClient.account,
       });
@@ -223,6 +239,7 @@ export default function CreateRoom() {
         deadline: Number(deadlineTs) * 1000,
         txHash: hash,
         creatorRole,
+        dashboardData: Object.keys(dashboardData).length > 0 ? dashboardData : undefined,
       });
       localStorage.setItem("concord_last_room", roomIdHex);
 
@@ -332,6 +349,7 @@ export default function CreateRoom() {
     setDealName("");
     setDealDesc("");
     setSelectedTerms([]);
+    setDashboardData({});
     setDeadline("");
     setDisplayName("");
     setNotifyXmtpAddr("");
@@ -399,7 +417,7 @@ export default function CreateRoom() {
                       {(Object.keys(NEGOTIATION_TYPES) as NegotiationType[]).map(t => (
                         <button
                           key={t}
-                          onClick={() => { setType(t); setSelectedTerms([]); }}
+                          onClick={() => { setType(t); setSelectedTerms([]); setDashboardData({}); }}
                           style={{
                             padding: "10px 20px", borderRadius: 14, fontSize: 13, fontWeight: 500,
                             transition: "all 0.25s", cursor: "pointer",
@@ -534,6 +552,8 @@ export default function CreateRoom() {
                                 {field.type === "select" ? (
                                   <select
                                     className="apple-input"
+                                    value={dashboardData[field.key] || ""}
+                                    onChange={e => setDashboardData(prev => ({ ...prev, [field.key]: e.target.value }))}
                                     style={{ width: "100%", padding: "10px 14px", borderRadius: 12, fontSize: 13, fontWeight: 500, background: "hsl(var(--input))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))", outline: "none" }}
                                   >
                                     <option value="">{field.placeholder}</option>
@@ -548,11 +568,15 @@ export default function CreateRoom() {
                                           type="number"
                                           step="any"
                                           placeholder={field.placeholder}
+                                          value={dashboardData[field.key] || ""}
+                                          onChange={e => setDashboardData(prev => ({ ...prev, [field.key]: e.target.value }))}
                                           className="apple-input"
                                           style={{ flex: 1, padding: "10px 14px", borderRadius: 12, fontSize: 13, fontWeight: 500, background: "hsl(var(--input))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))", outline: "none" }}
                                         />
                                         <select
                                           className="apple-input"
+                                          value={dashboardData[field.key + "_unit"] || units[0]}
+                                          onChange={e => setDashboardData(prev => ({ ...prev, [field.key + "_unit"]: e.target.value }))}
                                           style={{ width: 90, padding: "10px 14px", borderRadius: 12, fontSize: 13, fontWeight: 500, background: "hsl(var(--input))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))", outline: "none", textAlign: "center" }}
                                         >
                                           {units.map(u => <option key={u} value={u}>{u}</option>)}
@@ -564,6 +588,8 @@ export default function CreateRoom() {
                                   <input
                                     type={field.type}
                                     placeholder={field.placeholder}
+                                    value={dashboardData[field.key] || ""}
+                                    onChange={e => setDashboardData(prev => ({ ...prev, [field.key]: e.target.value }))}
                                     className="apple-input"
                                     style={{ width: "100%", padding: "10px 14px", borderRadius: 12, fontSize: 13, fontWeight: 500, background: "hsl(var(--input))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))", outline: "none" }}
                                   />
@@ -930,6 +956,27 @@ export default function CreateRoom() {
                       {selectedTerms.map(t => (
                         <span key={t} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, background: "rgba(10,132,255,0.1)", border: "1px solid rgba(10,132,255,0.2)", color: "#0a84ff" }}>{t}</span>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Dashboard Fields Summary */}
+                  {meta.dashboardFields && meta.dashboardFields.length > 0 && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px", marginBottom: 12, padding: 12, borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                      {meta.dashboardFields.map(field => {
+                        const val = dashboardData[field.key];
+                        if (!val) return null;
+                        let displayVal = val;
+                        if (field.type === "currency") {
+                          const unit = dashboardData[field.key + "_unit"] || (field.units ? field.units[0] : "USD");
+                          displayVal = `$${parseFloat(val).toLocaleString()} ${unit}`;
+                        }
+                        return (
+                          <div key={field.key}>
+                            <div style={{ fontSize: 10, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.05em" }}>{field.label}</div>
+                            <div style={{ fontSize: 12, color: "hsl(var(--foreground))", fontWeight: 500 }}>{displayVal}</div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 

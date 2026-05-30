@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Lock, Zap, CheckCircle2, XCircle, ArrowRight, Wallet,
   Copy, Check, ShieldCheck, Users, AlertCircle, Hash, RefreshCw,
+  FileText, X,
 } from "lucide-react";
 import { useAccount, usePublicClient, useWalletClient, useReadContract } from "wagmi";
 import { useModal } from "connectkit";
@@ -163,6 +164,7 @@ export default function RoomPage() {
   const [encryptStep, setEncryptStep] = useState("");
   const [encryptError, setEncryptError] = useState("");
   const [codeCopied, setCodeCopied] = useState(false);
+  const [showDealDetails, setShowDealDetails] = useState(false);
   const feedEndRef = useRef<HTMLDivElement>(null);
   const roomCode = id.startsWith("0x") ? roomIdToCode(id as `0x${string}`) : id.replace(/-/g, "").toUpperCase().slice(0, 3) + "·" + id.replace(/-/g, "").toUpperCase().slice(3, 6);
   const isPartyA = room?.partyA?.address?.toLowerCase() === walletAddr?.toLowerCase();
@@ -179,6 +181,41 @@ export default function RoomPage() {
       refetchInterval: 8000, // Poll every 8 seconds for real-time counterparty detection
     },
   });
+
+  // Query on-chain room metadata
+  const { data: onChainMetadata } = useReadContract({
+    address: BLIND_NEGOTIATION_ADDRESS,
+    abi: BLIND_NEGOTIATION_ABI,
+    functionName: "roomMetadata",
+    args: id.startsWith("0x") ? [id as `0x${string}`] : undefined,
+    query: {
+      enabled: id.startsWith("0x"),
+    },
+  });
+
+  let parsedMetadata: any = null;
+  if (onChainMetadata && typeof onChainMetadata === "string" && onChainMetadata.trim() !== "") {
+    try {
+      parsedMetadata = JSON.parse(onChainMetadata);
+    } catch (e) {
+      console.warn("Failed to parse on-chain metadata:", e);
+    }
+  }
+
+  const fallbackMetadata = room ? {
+    type: room.type,
+    label: room.label,
+    dealName: room.dealName,
+    dealDesc: room.dealDesc,
+    selectedTerms: room.selectedTerms,
+    deadline: room.deadlineStr,
+    displayName: room.displayName,
+    creatorRole: room.creatorRole,
+    dashboardData: room.dashboardData,
+    dashboardFields: room ? NEGOTIATION_TYPES[room.type]?.dashboardFields : [],
+  } : null;
+
+  const metadataToShow = parsedMetadata || fallbackMetadata;
 
   const NEG_TYPE_MAP: Record<number, keyof typeof NEGOTIATION_TYPES> = { 0: "ma", 1: "salary", 2: "realestate", 3: "custom" };
 
@@ -205,15 +242,21 @@ export default function RoomPage() {
         ...(r || {}), // preserve local fields like txHash, label overrides
         id,
         roomIdHex: id,
-        type: r?.type ?? negKey,
-        label: r?.label ?? meta.label,
+        type: r?.type ?? parsedMetadata?.type ?? negKey,
+        label: r?.label ?? parsedMetadata?.label ?? meta.label,
         status: statusMap[status] ?? "pending_b",
         partyA: partyA !== zeroAddr ? { address: partyA, timestamp: r?.partyA?.timestamp ?? Number(createdAt) * 1000 } : r?.partyA,
         partyB: partyB !== zeroAddr ? { address: partyB, timestamp: r?.partyB?.timestamp ?? Date.now() } : r?.partyB,
         createdAt: r?.createdAt ?? Number(createdAt) * 1000,
         deadline: r?.deadline ?? Number(deadline) * 1000,
         txHash: r?.txHash,
-        creatorRole: r?.creatorRole ?? creatorRole,
+        creatorRole: r?.creatorRole ?? parsedMetadata?.creatorRole ?? creatorRole,
+        dealName: r?.dealName ?? parsedMetadata?.dealName,
+        dealDesc: r?.dealDesc ?? parsedMetadata?.dealDesc,
+        selectedTerms: r?.selectedTerms ?? parsedMetadata?.selectedTerms,
+        deadlineStr: r?.deadlineStr ?? parsedMetadata?.deadline,
+        displayName: r?.displayName ?? parsedMetadata?.displayName,
+        dashboardData: r?.dashboardData ?? parsedMetadata?.dashboardData,
         result: isResultPublished ? {
           matched: onChainMatched,
           agreedPrice: Number(onChainPrice) > 0 ? Number(onChainPrice) : undefined,
@@ -225,7 +268,8 @@ export default function RoomPage() {
       // Only update if something actually changed
       const hasNewPartyB = partyB !== zeroAddr && !r?.partyB;
       const hasNoCreatorRole = !r?.creatorRole;
-      if (hasNewPartyB || !r?.partyA || hasNoCreatorRole) {
+      const hasNoDealName = parsedMetadata?.dealName && !r?.dealName;
+      if (hasNewPartyB || !r?.partyA || hasNoCreatorRole || hasNoDealName) {
         saveRoom(enrichedRoom);
       }
       setRoom(enrichedRoom);
@@ -481,6 +525,30 @@ export default function RoomPage() {
                   View on BaseScan ↗
                 </a>
               )}
+              {metadataToShow && (
+                <button
+                  onClick={() => setShowDealDetails(true)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: "rgba(10,132,255,0.12)",
+                    border: "1px solid rgba(10,132,255,0.25)",
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "#5ac8fa",
+                    marginTop: 8,
+                    cursor: "pointer",
+                    transition: "all 0.2s"
+                  }}
+                  className="hover:bg-[rgba(10,132,255,0.18)]"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  View Deal Details
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
@@ -633,6 +701,198 @@ export default function RoomPage() {
           )}
         </div>
       </div>
+
+      {/* DEAL DETAILS MODAL */}
+      <AnimatePresence>
+        {showDealDetails && metadataToShow && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="deal-details-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDealDetails(false)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 100,
+                background: "rgba(0, 0, 0, 0.6)",
+                backdropFilter: "blur(12px)",
+              }}
+            />
+
+            {/* Centering Wrapper */}
+            <div style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 101,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
+              padding: 20,
+            }}>
+              {/* Modal Container */}
+              <motion.div
+                key="deal-details-modal"
+                initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 360, damping: 28 }}
+                style={{
+                  width: "100%",
+                  maxWidth: 500,
+                  maxHeight: "85vh",
+                  overflowY: "auto",
+                  background: "rgba(28, 28, 30, 0.8)",
+                  backdropFilter: "blur(20px)",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: 24,
+                  padding: "24px 24px 28px",
+                  boxShadow: "0 24px 60px rgba(0, 0, 0, 0.6)",
+                  pointerEvents: "auto",
+                  color: "hsl(var(--foreground))",
+                }}
+              >
+                {/* Header */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgba(10,132,255,0.12)", border: "1px solid rgba(10,132,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <FileText style={{ width: 16, height: 16, color: "#0a84ff" }} />
+                    </div>
+                    <div>
+                      <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>Deal Details</h2>
+                      <p style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", margin: 0 }}>On-chain negotiation context</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowDealDetails(false)}
+                    style={{
+                      background: "rgba(255,255,255,0.05)",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: 28,
+                      height: 28,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      color: "hsl(var(--muted-foreground))",
+                      transition: "all 0.2s",
+                    }}
+                    className="hover:bg-white/10 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div style={{ height: 1, background: "rgba(255,255,255,0.08)", marginBottom: 16 }} />
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {/* Negotiation Type Badge */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Negotiation Type</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: "rgba(10,132,255,0.12)", border: "1px solid rgba(10,132,255,0.25)", color: "#0a84ff" }}>
+                      {metadataToShow.label || metadataToShow.type}
+                    </span>
+                  </div>
+
+                  {/* Deal Title */}
+                  {metadataToShow.dealName && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.05em" }}>Deal Title / Role</span>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{metadataToShow.dealName}</div>
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  {metadataToShow.dealDesc && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.05em" }}>Description</span>
+                      <div style={{ fontSize: 12, color: "hsl(var(--foreground))", opacity: 0.8, lineHeight: 1.5, padding: 12, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                        {metadataToShow.dealDesc}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Deal Terms tags */}
+                  {metadataToShow.selectedTerms && metadataToShow.selectedTerms.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <span style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.05em" }}>Agreed Terms &amp; Conditions</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {metadataToShow.selectedTerms.map((t: string) => (
+                          <span key={t} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, background: "rgba(10,132,255,0.08)", border: "1px solid rgba(10,132,255,0.15)", color: "#5ac8fa" }}>
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dashboard Fields Grid */}
+                  {metadataToShow.dashboardFields && metadataToShow.dashboardFields.length > 0 && metadataToShow.dashboardData && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <span style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", textTransform: "uppercase", letterSpacing: "0.05em" }}>Deal Specifications</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, padding: 12, borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                        {metadataToShow.dashboardFields.map((field: any) => {
+                          const val = metadataToShow.dashboardData[field.key];
+                          if (!val) return null;
+                          let displayVal = val;
+                          if (field.type === "currency") {
+                            const unit = metadataToShow.dashboardData[field.key + "_unit"] || (field.units ? field.units[0] : "USD");
+                            displayVal = `$${parseFloat(val).toLocaleString()} ${unit}`;
+                          }
+                          return (
+                            <div key={field.key}>
+                              <div style={{ fontSize: 10, color: "hsl(var(--muted-foreground))" }}>{field.label}</div>
+                              <div style={{ fontSize: 12, fontWeight: 500, marginTop: 2 }}>{displayVal}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Deadline & Initiated By */}
+                  <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "4px 0" }} />
+
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: "hsl(var(--muted-foreground))" }}>Initiated By</span>
+                    <span style={{ fontFamily: "monospace", opacity: 0.8 }}>
+                      {metadataToShow.displayName ? `${metadataToShow.displayName} (${room.partyA?.address?.slice(0, 6)}…)` : room.partyA?.address ? `${room.partyA.address.slice(0, 6)}…${room.partyA.address.slice(-4)}` : "Party A"}
+                    </span>
+                  </div>
+
+                  {metadataToShow.deadline && (
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                      <span style={{ color: "hsl(var(--muted-foreground))" }}>Offer Expires</span>
+                      <span>{metadataToShow.deadline} {metadataToShow.timezone || "UTC"}</span>
+                    </div>
+                  )}
+
+                  {/* Shield / FHE Notice (NO PRICE NOTICE) */}
+                  <div style={{
+                    marginTop: 8,
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    background: "rgba(48,209,88,0.05)",
+                    border: "1px solid rgba(48,209,88,0.15)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8
+                  }}>
+                    <ShieldCheck style={{ width: 14, height: 14, color: "#30d158", flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, color: "#30d158", lineHeight: 1.4 }}>
+                      Party A's price floor remains fully encrypted by FHE and is not visible in this list.
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
