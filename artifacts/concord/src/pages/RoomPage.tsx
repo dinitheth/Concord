@@ -365,7 +365,7 @@ export default function RoomPage() {
     const normalizedPrice = normalizeToDefaultUnit(parsedPrice, priceUnit, meta.unit);
 
     const MAX_ATTEMPTS = 3;
-    const TIMEOUT_MS = 60000; // 60s per attempt
+    const TIMEOUT_MS = 180000; // 180s per attempt (accommodates cold WASM/key download on new profiles)
 
     const stepLabels: Record<string, string> = {
       InitTfhe: "Loading TFHE engine",

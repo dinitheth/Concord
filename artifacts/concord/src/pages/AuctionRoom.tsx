@@ -176,7 +176,7 @@ export default function AuctionRoom() {
           encryptPrice(BigInt(Math.round(parsed)), (p) => {
             if (p.isStart) setEncryptStep(attempt > 1 ? `Retry ${attempt}. ${stepLabels[p.step] || p.step}` : stepLabels[p.step] || p.step);
           }),
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Timed out")), 60000)),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Timed out")), 180000)),
         ]);
 
         setSubmitStatus("computing");
