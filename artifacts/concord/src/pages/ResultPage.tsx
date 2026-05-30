@@ -431,7 +431,7 @@ export default function ResultPage() {
               </div>
 
               {/* Settlement — Wave 4: ConfidentialEscrow */}
-              {(!isEncrypted && matched) && (
+              {(!isEncrypted && matched && escrowStatus !== EscrowStatus.None) && (
                 <motion.div
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -449,35 +449,7 @@ export default function ResultPage() {
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
                         style={{ background: "rgba(255,214,10,0.08)", color: "#ffd60a", border: "1px solid rgba(255,214,10,0.15)" }}>Refunded</span>
                     )}
-                    {escrowStatus === EscrowStatus.None && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        style={{ background: "rgba(255,214,10,0.08)", color: "#ffd60a", border: "1px solid rgba(255,214,10,0.15)" }}>No Escrow</span>
-                    )}
                   </div>
-
-                  {/* No escrow — prompt to set one up */}
-                  {escrowStatus === EscrowStatus.None && (
-                    <>
-                      <h3 className="text-[15px] font-semibold text-foreground sf-headline mb-1.5">ConfidentialEscrow</h3>
-                      <p className="text-[13px] text-foreground/40 leading-relaxed mb-3">
-                        {isViewerBuyer ? (
-                          "Lock funds on-chain before negotiating. On a match, the agreed amount is auto-transferred to the seller. No intermediary. No trust required."
-                        ) : (
-                          "Waiting for the buyer to set up the trustless escrow contract to secure and transfer the funds."
-                        )}
-                      </p>
-                      {isViewerBuyer ? (
-                        <button onClick={() => navigate(`/deposit/${id}`)}
-                          className="btn-apple-secondary text-[13px] px-4 py-2 flex items-center gap-2 w-full justify-center">
-                          Set Up Escrow <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                      ) : (
-                        <div className="text-[12px] font-medium text-foreground/40 py-2 text-center bg-white/5 rounded-xl border border-white/10">
-                          Waiting for Buyer's Deposit
-                        </div>
-                      )}
-                    </>
-                  )}
 
                   {/* Active escrow — show settle button */}
                   {hasActiveEscrow && (
