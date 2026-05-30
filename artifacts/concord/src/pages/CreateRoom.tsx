@@ -112,6 +112,17 @@ export default function CreateRoom() {
     setEncStatus("done");
   }, []);
 
+  const getTomorrowString = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const yyyy = tomorrow.getFullYear();
+    const mm = String(tomorrow.getMonth() + 1).padStart(2, "0");
+    const dd = String(tomorrow.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const isDeadlineValid = !deadline || new Date(deadline).getTime() > Date.now();
+
   // Derived from type/price state
   const meta = NEGOTIATION_TYPES[type];
   const parsedPrice = parseFloat(price);
@@ -609,6 +620,7 @@ export default function CreateRoom() {
                               type="date"
                               value={deadline}
                               onChange={e => setDeadline(e.target.value)}
+                              min={getTomorrowString()}
                               className="apple-input"
                               style={{
                                 width: "100%", padding: "12px 14px 12px 36px", borderRadius: 12, fontSize: 13, fontWeight: 500,
@@ -632,6 +644,11 @@ export default function CreateRoom() {
                             ))}
                           </select>
                         </div>
+                        {deadline && !isDeadlineValid && (
+                          <div style={{ fontSize: 11, color: "#ff453a", marginTop: 6, padding: "7px 10px", borderRadius: 8, background: "rgba(255,69,58,0.08)", border: "1px solid rgba(255,69,58,0.2)" }}>
+                            Deadline must be a future date (tomorrow or later).
+                          </div>
+                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -853,19 +870,19 @@ export default function CreateRoom() {
                         <div style={{
                           position: "absolute", inset: -4,
                           background: "linear-gradient(90deg, #22d3ee, #3b82f6)",
-                          borderRadius: 16, filter: "blur(12px)", opacity: (!isValid || !walletConnected || !publicClient || !walletClient || notifyAddrInvalid) ? 0 : 0.2,
+                          borderRadius: 16, filter: "blur(12px)", opacity: (!isValid || !walletConnected || !publicClient || !walletClient || notifyAddrInvalid || !isDeadlineValid) ? 0 : 0.2,
                           transition: "opacity 0.5s", pointerEvents: "none",
                         }} />
                         <button
                           onClick={() => setShowConfirm(true)}
-                          disabled={!isValid || !walletConnected || !publicClient || !walletClient || notifyAddrInvalid || encStatus === "encrypting"}
+                          disabled={!isValid || !walletConnected || !publicClient || !walletClient || notifyAddrInvalid || !isDeadlineValid || encStatus === "encrypting"}
                           style={{
                             position: "relative", width: "100%", padding: "16px 24px",
                             borderRadius: 14, fontSize: 15, fontWeight: 700,
-                            background: (!isValid || !walletConnected || !publicClient || !walletClient || notifyAddrInvalid) ? "hsl(var(--secondary))" : "hsl(var(--primary))",
-                            color: (!isValid || !walletConnected || !publicClient || !walletClient || notifyAddrInvalid) ? "hsl(var(--muted-foreground))" : "hsl(var(--primary-foreground))", border: "1px solid hsl(var(--border))",
-                            cursor: (!isValid || !walletConnected || !publicClient || !walletClient || notifyAddrInvalid || encStatus === "encrypting") ? "not-allowed" : "pointer",
-                            opacity: (!isValid || !walletConnected || !publicClient || !walletClient || notifyAddrInvalid) ? 0.6 : 1,
+                            background: (!isValid || !walletConnected || !publicClient || !walletClient || notifyAddrInvalid || !isDeadlineValid) ? "hsl(var(--secondary))" : "hsl(var(--primary))",
+                            color: (!isValid || !walletConnected || !publicClient || !walletClient || notifyAddrInvalid || !isDeadlineValid) ? "hsl(var(--muted-foreground))" : "hsl(var(--primary-foreground))", border: "1px solid hsl(var(--border))",
+                            cursor: (!isValid || !walletConnected || !publicClient || !walletClient || notifyAddrInvalid || !isDeadlineValid || encStatus === "encrypting") ? "not-allowed" : "pointer",
+                            opacity: (!isValid || !walletConnected || !publicClient || !walletClient || notifyAddrInvalid || !isDeadlineValid) ? 0.6 : 1,
                             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                             transition: "all 0.3s",
                           }}
@@ -876,6 +893,8 @@ export default function CreateRoom() {
                             <><Wallet style={{ width: 15, height: 15 }} />Connect Wallet to Continue</>
                           ) : (!publicClient || !walletClient) ? (
                             <><div style={{ width: 15, height: 15, border: "2px solid hsl(var(--muted-foreground))", borderTop: "2px solid white", borderRadius: "50%" }} className="animate-spin" />Initializing Wallet…</>
+                          ) : !isDeadlineValid ? (
+                            <><Calendar style={{ width: 15, height: 15 }} />Fix Expiration Date</>
                           ) : notifyAddrInvalid ? (
                             <><Bell style={{ width: 15, height: 15 }} />Fix Counterparty Address</>
                           ) : (

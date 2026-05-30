@@ -52,6 +52,20 @@ export default function CreateAuction() {
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
 
+  const isDeadlineValid = !deadline || new Date(deadline).getTime() > Date.now();
+
+  const getMinDatetimeLocal = () => {
+    const now = new Date();
+    // Add 5 minutes to prevent selecting past/current time
+    const minTime = new Date(now.getTime() + 5 * 60 * 1000);
+    const yyyy = minTime.getFullYear();
+    const mm = String(minTime.getMonth() + 1).padStart(2, "0");
+    const dd = String(minTime.getDate()).padStart(2, "0");
+    const hh = String(minTime.getHours()).padStart(2, "0");
+    const min = String(minTime.getMinutes()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  };
+
   // Resize bidder address array when maxBidders changes
   useEffect(() => {
     setBidderAddresses(prev => {
@@ -491,7 +505,14 @@ export default function CreateAuction() {
             {/* Deadline */}
             <div style={LABEL_STYLE}><Calendar className="w-3.5 h-3.5" /> Bidding Deadline</div>
             <input type="datetime-local" value={deadline} onChange={e => setDeadline(e.target.value)}
-              className="w-full apple-card px-4 py-3 text-[13px] text-foreground bg-transparent mb-6 outline-none" />
+              min={getMinDatetimeLocal()}
+              className="w-full apple-card px-4 py-3 text-[13px] text-foreground bg-transparent mb-1 outline-none" />
+            {deadline && !isDeadlineValid && (
+              <div style={{ fontSize: 11, color: "#ff453a", marginBottom: 24, padding: "7px 10px", borderRadius: 8, background: "rgba(255,69,58,0.08)", border: "1px solid rgba(255,69,58,0.2)" }}>
+                Bidding deadline must be in the future.
+              </div>
+            )}
+            {!(!deadline || isDeadlineValid) ? null : <div style={{ height: 16 }} />}
 
             {/* Wallet + Submit */}
             {!walletConnected ? (
@@ -499,7 +520,7 @@ export default function CreateAuction() {
                 <Wallet className="w-4 h-4" /> Connect Wallet
               </button>
             ) : (
-              <button onClick={() => setShowConfirm(true)} disabled={!price || parseFloat(price) <= 0}
+              <button onClick={() => setShowConfirm(true)} disabled={!price || parseFloat(price) <= 0 || !isDeadlineValid}
                 className="btn-apple w-full py-3.5 text-[14px] flex items-center justify-center gap-2 disabled:opacity-30">
                 <Lock className="w-4 h-4" />
                 {validCount > 0
