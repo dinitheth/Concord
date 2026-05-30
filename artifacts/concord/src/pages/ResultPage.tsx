@@ -460,13 +460,22 @@ export default function ResultPage() {
                     <>
                       <h3 className="text-[15px] font-semibold text-foreground sf-headline mb-1.5">ConfidentialEscrow</h3>
                       <p className="text-[13px] text-foreground/40 leading-relaxed mb-3">
-                        Lock funds on-chain before negotiating. On a match, the agreed amount is auto-transferred to the seller.
-                        No intermediary. No trust required.
+                        {isViewerBuyer ? (
+                          "Lock funds on-chain before negotiating. On a match, the agreed amount is auto-transferred to the seller. No intermediary. No trust required."
+                        ) : (
+                          "Waiting for the buyer to set up the trustless escrow contract to secure and transfer the funds."
+                        )}
                       </p>
-                      <button onClick={() => navigate(`/deposit/${id}`)}
-                        className="btn-apple-secondary text-[13px] px-4 py-2 flex items-center gap-2 w-full justify-center">
-                        Set Up Escrow <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                      {isViewerBuyer ? (
+                        <button onClick={() => navigate(`/deposit/${id}`)}
+                          className="btn-apple-secondary text-[13px] px-4 py-2 flex items-center gap-2 w-full justify-center">
+                          Set Up Escrow <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <div className="text-[12px] font-medium text-foreground/40 py-2 text-center bg-white/5 rounded-xl border border-white/10">
+                          Waiting for Buyer's Deposit
+                        </div>
+                      )}
                     </>
                   )}
 

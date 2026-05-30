@@ -30,6 +30,11 @@ export default function DepositPage() {
   const floorPrice = room?.myPrice ?? 0;
   const priceUnit = room?.myPriceUnit ?? "USD";
 
+  const isCreator = room && address && room.partyA?.address?.toLowerCase() === address.toLowerCase();
+  const isViewerBuyer = !room || (
+    room.creatorRole === "buyer" ? isCreator : !isCreator
+  );
+
   // Convert the raw price + unit to the actual USDC amount (6 decimals)
   function priceToRawUSDC(value: number, unit: string): bigint {
     let usd = value;
@@ -227,7 +232,22 @@ export default function DepositPage() {
 
           {!alreadyDeposited && step !== "done" && (
             <>
-              {/* How it works */}
+              {!isViewerBuyer ? (
+                <div className="apple-card p-6 text-center space-y-4" style={{ borderColor: "rgba(255,214,10,0.2)", background: "rgba(255,214,10,0.02)" }}>
+                  <div className="w-12 h-12 rounded-full mx-auto flex items-center justify-center bg-[rgba(255,214,10,0.08)] border border-[rgba(255,214,10,0.15)]">
+                    <AlertCircle className="w-6 h-6 text-[#ffd60a]" />
+                  </div>
+                  <h2 className="sf-display text-[18px] text-foreground font-semibold">You are the Seller</h2>
+                  <p className="text-[13px] text-foreground/45 leading-relaxed max-w-sm mx-auto">
+                    Only the buyer is required to commit and lock capital in the escrow contract. As the seller, you do not need to deposit any funds. You will automatically receive the agreed payment on a successful match.
+                  </p>
+                  <button onClick={handleSkip} className="btn-apple w-full py-3 text-[14px]">
+                    Back to Room
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* How it works */}
               <div className="apple-card p-5 space-y-3">
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-foreground/30">How Escrow Works</p>
                 {[
@@ -332,6 +352,8 @@ export default function DepositPage() {
                 className="btn-ghost w-full py-3 text-[14px]" style={{ opacity: isProcessing ? 0.4 : 1 }}>
                 Skip — No Escrow
               </button>
+                </>
+              )}
             </>
           )}
         </motion.div>
