@@ -323,7 +323,7 @@ export default function LandingPage() {
             <div style={{ display: "grid", gridTemplateColumns: "200px 1fr 1fr 1fr", background: "var(--subtle-bg)", borderBottom: "1px solid var(--divider)" }}>
               <div className="px-5 py-4" />
               {[
-                { label: "Traditional Escrow", status: "Broken", statusColor: "#ff453a", statusBg: "rgba(255,69,58,0.1)", colBg: "rgba(255,69,58,0.03)" },
+                { label: "Trusted Third Party", status: "Broken", statusColor: "#ff453a", statusBg: "rgba(255,69,58,0.1)", colBg: "rgba(255,69,58,0.03)" },
                 { label: "Zero-Knowledge Proofs", status: "Insufficient", statusColor: "#ffd60a", statusBg: "rgba(255,214,10,0.1)", colBg: "rgba(255,214,10,0.02)" },
                 { label: "Fhenix CoFHE", status: "The solution", statusColor: "#30d158", statusBg: "rgba(48,209,88,0.1)", colBg: "rgba(48,209,88,0.04)" },
               ].map((col, i) => (
