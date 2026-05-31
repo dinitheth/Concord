@@ -8,7 +8,7 @@ import {
   getExplorerTxUrl, BLIND_NEGOTIATION_ADDRESS, BLIND_NEGOTIATION_ABI,
 } from "@/lib/contracts";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient } from "wagmi";
-import { decryptForTx, initFHE } from "@/lib/fhe";
+import { decryptBoolForView, decryptUint64ForView, initFHE } from "@/lib/fhe";
 
 export default function ResultPage() {
   const [, params] = useRoute("/result/:id");
@@ -194,14 +194,14 @@ export default function ResultPage() {
       });
       const [ctPrice, ctMatch] = encResult as [`0x${string}`, `0x${string}`];
 
-      // 2. Actually decrypt them using the Threshold Network (via Fhenix CoFHE)
-      const matchResult = await decryptForTx(ctMatch);
-      const decryptedMatch = Boolean(matchResult.decryptedValue);
+      // 2. Actually decrypt them using the local view client (via Fhenix CoFHE)
+      const matchResult = await decryptBoolForView(ctMatch);
+      const decryptedMatch = matchResult;
       let decryptedPrice = 0;
 
       if (decryptedMatch) {
-        const priceResult = await decryptForTx(ctPrice);
-        decryptedPrice = Number(priceResult.decryptedValue);
+        const priceResult = await decryptUint64ForView(ctPrice);
+        decryptedPrice = Number(priceResult);
       }
 
       // 3. Publish the decrypted plaintext result to the contract!

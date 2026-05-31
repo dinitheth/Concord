@@ -181,9 +181,9 @@ export async function decryptForTx(
 }
 
 /**
- * Decrypt the match result (ebool) for UI display.
+ * Decrypt the match result (ebool) locally using the permit.
  */
-export async function decryptMatchForView(ctHash: string): Promise<boolean> {
+export async function decryptBoolForView(ctHash: string): Promise<boolean> {
   if (!client || !isConnected) {
     throw new Error("[FHE] Client not initialized. Call initFHE() first.");
   }
@@ -195,6 +195,47 @@ export async function decryptMatchForView(ctHash: string): Promise<boolean> {
     .execute();
 
   return result as boolean;
+}
+
+/**
+ * Decrypt a uint64 value locally using the permit.
+ */
+export async function decryptUint64ForView(ctHash: string): Promise<bigint> {
+  if (!client || !isConnected) {
+    throw new Error("[FHE] Client not initialized. Call initFHE() first.");
+  }
+
+  await client.permits.getOrCreateSelfPermit();
+
+  const result = await client
+    .decryptForView(ctHash, FheTypes.Uint64)
+    .execute();
+
+  return result as bigint;
+}
+
+/**
+ * Decrypt a uint32 value locally using the permit.
+ */
+export async function decryptUint32ForView(ctHash: string): Promise<number> {
+  if (!client || !isConnected) {
+    throw new Error("[FHE] Client not initialized. Call initFHE() first.");
+  }
+
+  await client.permits.getOrCreateSelfPermit();
+
+  const result = await client
+    .decryptForView(ctHash, FheTypes.Uint32)
+    .execute();
+
+  return Number(result);
+}
+
+/**
+ * Decrypt the match result (ebool) for UI display.
+ */
+export async function decryptMatchForView(ctHash: string): Promise<boolean> {
+  return decryptBoolForView(ctHash);
 }
 
 /**

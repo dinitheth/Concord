@@ -6,7 +6,7 @@ import NavBar from "@/components/NavBar";
 import { getAuction, saveAuction, NEGOTIATION_TYPES, type Auction } from "@/lib/concord";
 import { MULTI_PARTY_AUCTION_ADDRESS, MULTI_PARTY_AUCTION_ABI, auctionConfig, getAuctionExplorerUrl, getExplorerTxUrl } from "@/lib/contracts";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient } from "wagmi";
-import { decryptForTx, initFHE } from "@/lib/fhe";
+import { decryptBoolForView, decryptUint64ForView, decryptUint32ForView, initFHE } from "@/lib/fhe";
 
 export default function AuctionResult() {
   const [, params] = useRoute("/auction/result/:id");
@@ -142,18 +142,18 @@ export default function AuctionResult() {
       });
       const [ctPrice, ctMatch, ctWinnerIndex] = encResult as [`0x${string}`, `0x${string}`, `0x${string}`];
 
-      const matchResult = await decryptForTx(ctMatch);
-      const decryptedMatch = Boolean(matchResult.decryptedValue);
+      const matchResult = await decryptBoolForView(ctMatch);
+      const decryptedMatch = matchResult;
       let decryptedPrice = 0;
       let winnerAddr = "0x0000000000000000000000000000000000000000";
 
       if (decryptedMatch) {
-        const priceResult = await decryptForTx(ctPrice);
-        decryptedPrice = Number(priceResult.decryptedValue);
+        const priceResult = await decryptUint64ForView(ctPrice);
+        decryptedPrice = Number(priceResult);
 
         try {
-          const winnerIndexResult = await decryptForTx(ctWinnerIndex);
-          const decryptedWinnerIndex = Number(winnerIndexResult.decryptedValue);
+          const winnerIndexResult = await decryptUint32ForView(ctWinnerIndex);
+          const decryptedWinnerIndex = winnerIndexResult;
 
           // Fetch winner address by index
           winnerAddr = await publicClient.readContract({
