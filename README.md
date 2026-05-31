@@ -284,12 +284,11 @@ This property is enforced cryptographically — not by policy or trust.
 | `/create` | 1-on-1: Set floor price, encrypt, create room |
 | `/join` | 1-on-1: Enter room code |
 | `/room/:id` | 1-on-1: Negotiation room — price submission and FHE computation |
-| `/result/:id` | 1-on-1: Deal outcome, escrow settlement |
+| `/result/:id` | 1-on-1: Deal outcome and agreement details |
 | `/auction/create` | Multi-party: Create sealed-bid auction, set floor, invite bidders |
 | `/auction/:id` | Multi-party: Live bidding room with countdown and bid progress |
 | `/auction/result/:id` | Multi-party: Winner reveal, decrypt & publish |
 | `/inbox` | On-chain inbox — received and sent invites |
-| `/deposit/:id` | Lock USDC escrow before negotiation |
 | `/negotiate` | Interactive demo — protocol demonstration |
 | `/profile` | User profile and negotiation history |
 
@@ -299,7 +298,6 @@ This property is enforced cryptographically — not by policy or trust.
 
 | `BlindNegotiation` | [`0x46BC52321a0B3C886Fccc2db88142727E44D3B7D`](https://sepolia.basescan.org/address/0x46BC52321a0B3C886Fccc2db88142727E44D3B7D) |
 | `MultiPartyAuction` | [`0xE21E40C8c96e22f019De2d982428a0D782cb6136`](https://sepolia.basescan.org/address/0xE21E40C8c96e22f019De2d982428a0D782cb6136) |
-| `ConfidentialEscrow` | [`0x1f818B5483C91CF0D1741bCe53A6EaE8FF617B1c`](https://sepolia.basescan.org/address/0x1f818B5483C91CF0D1741bCe53A6EaE8FF617B1c) |
 | `USDC` (Base Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
 ---
@@ -327,30 +325,6 @@ The application runs at `http://localhost:5173`.
 - Node.js 18+
 - pnpm
 - Foundry (for contract compilation/deployment)
-
----
-
-## Wave 4: Confidential Escrow & Auto-Settlement
-
-Wave 4 adds the financial execution layer. Instead of stopping at price discovery, the protocol handles end-to-end trustless settlement using on-chain USDC escrow.
-
-### Settlement Flow
-
-```
-1. Buyer deposits max capital (USDC) into ConfidentialEscrow before negotiation
-2. BlindNegotiation runs FHE comparison as normal (unchanged)
-3. Either party calls publishResult() on BlindNegotiation
-4. Either party calls settleEscrow() on ConfidentialEscrow
-5a. MATCH:    agreed midpoint → seller | remainder → buyer  (auto)
-5b. NO MATCH: full deposit → buyer                          (auto)
-```
-
-### Key Properties
-
-- **Trustless:** ConfidentialEscrow reads the result directly from BlindNegotiation — no manual input
-- **Non-custodial:** Funds can only move to seller (on match) or back to buyer (on no-match or emergency)
-- **Emergency refund:** Buyer can reclaim funds 48 hours after deposit if deal goes stale
-- **Separation of concerns:** FHE logic stays in BlindNegotiation; money logic stays in ConfidentialEscrow
 
 ---
 
@@ -390,7 +364,6 @@ All operations run on encrypted ciphertext. No bid value, rank, or eligibility s
 - **Zero-Knowledge No-Deal:** When no overlap exists, neither party learns any bound
 - **Partial Revelation on Deal:** Only the midpoint is revealed; individual prices remain encrypted
 - **Auction Secrecy:** No bidder learns any other bidder's price, rank, or eligibility
-- **Trustless Settlement:** ConfidentialEscrow enforces payment based on cryptographic proof, not human trust
 
 ---
 

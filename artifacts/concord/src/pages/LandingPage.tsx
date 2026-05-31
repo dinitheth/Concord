@@ -48,7 +48,7 @@ const useCases = [
   { icon: Building2, title: "M&A", desc: "Floor $80M, ceiling $95M. Deal found at $87.5M. Neither party's price disclosed." },
   { icon: TrendingUp, title: "Salary", desc: "Candidate wants $180K, company budgets $210K. Match at $195K. Zero awkwardness." },
   { icon: Home, title: "Real Estate", desc: "Minimum $650K, max offer $700K. Closes at $675K without a mediator." },
-  { icon: Globe, title: "Bond Pricing", desc: "Private yield discovery with automatic settlement via ReineiraOS ConfidentialEscrow." },
+  { icon: Globe, title: "Bond Pricing", desc: "Private yield discovery and rate optimization using fully homomorphic encryption." },
 ];
 
 function HowItWorks() {
@@ -207,7 +207,6 @@ export default function LandingPage() {
             className="flex items-center justify-center gap-2.5 mb-8"
           >
             <FHEBadge label="Fhenix CoFHE" />
-            <FHEBadge variant="reineira" label="ReineiraOS" />
           </motion.div>
 
           <motion.h1

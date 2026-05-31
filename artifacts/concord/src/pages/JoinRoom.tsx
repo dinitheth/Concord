@@ -98,7 +98,7 @@ export default function JoinRoom() {
           transition={{ duration: 0.5, ease: [0.32, 0, 0, 1] }}
           className="pt-10 mb-6"
         >
-          <FHEBadge label="End-to-end encrypted" variant="reineira" />
+          <FHEBadge label="End-to-end encrypted" variant="neutral" />
           <h1 className="sf-display text-[28px] text-foreground mt-4 mb-1">Join Room</h1>
           <p className="text-[13px] text-foreground/40">
             Enter the room code shared by your counterparty.

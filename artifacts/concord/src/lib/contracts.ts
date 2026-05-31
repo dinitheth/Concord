@@ -11,7 +11,6 @@ import { baseSepolia } from "wagmi/chains";
 // ── Contract Addresses ──────────────────────────────────────────
 // Wave 4 deployment — Base Sepolia (Chain 84532)
 export const BLIND_NEGOTIATION_ADDRESS: Address  = "0x46BC52321a0B3C886Fccc2db88142727E44D3B7D";
-export const CONFIDENTIAL_ESCROW_ADDRESS: Address = "0x1f818B5483C91CF0D1741bCe53A6EaE8FF617B1c";
 
 // USDC on Base Sepolia
 export const USDC_ADDRESS: Address = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -273,7 +272,7 @@ export const BLIND_NEGOTIATION_ABI = [
     outputs: [],
     stateMutability: "nonpayable",
   },
-  // Wave 4: getPublishedResult (used by ConfidentialEscrow)
+  // Wave 4: getPublishedResult
   {
     type: "function",
     name: "getPublishedResult",
@@ -292,95 +291,6 @@ export const BLIND_NEGOTIATION_ABI = [
     inputs: [{ name: "", type: "bytes32" }],
     outputs: [{ name: "", type: "string" }],
     stateMutability: "view",
-  },
-] as const;
-
-// ── Confidential Escrow ABI ─────────────────────────────────────
-export const CONFIDENTIAL_ESCROW_ABI = [
-  // depositEscrow
-  {
-    type: "function",
-    name: "depositEscrow",
-    inputs: [
-      { name: "roomId", type: "bytes32" },
-      { name: "amount", type: "uint256" },
-      { name: "seller", type: "address" },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  // settleEscrow
-  {
-    type: "function",
-    name: "settleEscrow",
-    inputs: [{ name: "roomId", type: "bytes32" }],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  // emergencyRefund
-  {
-    type: "function",
-    name: "emergencyRefund",
-    inputs: [{ name: "roomId", type: "bytes32" }],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-  // getEscrow
-  {
-    type: "function",
-    name: "getEscrow",
-    inputs: [{ name: "roomId", type: "bytes32" }],
-    outputs: [
-      { name: "", type: "tuple", components: [
-        { name: "buyer",         type: "address" },
-        { name: "seller",        type: "address" },
-        { name: "depositAmount", type: "uint256" },
-        { name: "agreedAmount",  type: "uint256" },
-        { name: "status",        type: "uint8"   },
-        { name: "depositedAt",   type: "uint256" },
-      ]},
-    ],
-    stateMutability: "view",
-  },
-  // hasActiveEscrow
-  {
-    type: "function",
-    name: "hasActiveEscrow",
-    inputs: [{ name: "roomId", type: "bytes32" }],
-    outputs: [{ name: "", type: "bool" }],
-    stateMutability: "view",
-  },
-  // EscrowDeposited event
-  {
-    type: "event",
-    name: "EscrowDeposited",
-    inputs: [
-      { name: "roomId",  type: "bytes32", indexed: true  },
-      { name: "buyer",   type: "address", indexed: true  },
-      { name: "seller",  type: "address", indexed: true  },
-      { name: "amount",  type: "uint256", indexed: false },
-    ],
-  },
-  // EscrowSettled event
-  {
-    type: "event",
-    name: "EscrowSettled",
-    inputs: [
-      { name: "roomId",       type: "bytes32", indexed: true  },
-      { name: "seller",       type: "address", indexed: true  },
-      { name: "agreedAmount", type: "uint256", indexed: false },
-      { name: "refundAmount", type: "uint256", indexed: false },
-    ],
-  },
-  // EscrowRefunded event
-  {
-    type: "event",
-    name: "EscrowRefunded",
-    inputs: [
-      { name: "roomId", type: "bytes32", indexed: true  },
-      { name: "buyer",  type: "address", indexed: true  },
-      { name: "amount", type: "uint256", indexed: false },
-    ],
   },
 ] as const;
 
@@ -457,35 +367,11 @@ export const contractConfig = {
   chainId: baseSepolia.id,
 } as const;
 
-export const escrowConfig = {
-  address: CONFIDENTIAL_ESCROW_ADDRESS,
-  abi: CONFIDENTIAL_ESCROW_ABI,
-  chainId: baseSepolia.id,
-} as const;
-
 export const usdcConfig = {
   address: USDC_ADDRESS,
   abi: USDC_ABI,
   chainId: baseSepolia.id,
 } as const;
-
-// ── Escrow Types ────────────────────────────────────────────────
-
-export enum EscrowStatus {
-  None      = 0,
-  Deposited = 1,
-  Settled   = 2,
-  Refunded  = 3,
-}
-
-export interface OnChainEscrow {
-  buyer:         Address;
-  seller:        Address;
-  depositAmount: bigint;   // USDC units (6 decimals)
-  agreedAmount:  bigint;   // USDC units (6 decimals)
-  status:        EscrowStatus;
-  depositedAt:   bigint;
-}
 
 // ── Helper Functions ────────────────────────────────────────────
 
@@ -575,9 +461,7 @@ export function getExplorerContractUrl(): string {
   return `https://sepolia.basescan.org/address/${BLIND_NEGOTIATION_ADDRESS}`;
 }
 
-export function getEscrowExplorerUrl(): string {
-  return `https://sepolia.basescan.org/address/${CONFIDENTIAL_ESCROW_ADDRESS}`;
-}
+
 
 /**
  * Format USDC amount (6 decimals) to human-readable string

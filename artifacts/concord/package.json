@@ -73,7 +73,6 @@
   },
   "dependencies": {
     "@cofhe/sdk": "0.5.2",
-    "@reineira-os/sdk": "^0.2.0",
     "@xmtp/browser-sdk": "^7.0.0",
     "connectkit": "^1.9.2",
     "ethers": "^6.16.0",

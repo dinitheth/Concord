@@ -32,7 +32,6 @@ export interface Room {
     agreedPrice?: number;
     timestamp: number;
     txHash?: string;
-    escrowId?: string;
     isEncrypted?: boolean;
   };
   createdAt: number;
@@ -146,7 +145,7 @@ export const NEGOTIATION_TYPES: Record<NegotiationType, {
   realestate: {
     label: "Real Estate",
     description: "Property price discovery",
-    detail: "Both parties independently commit without anchoring each other. If ranges overlap, escrow is triggered on-chain automatically.",
+    detail: "Both parties independently commit without anchoring each other. If ranges overlap, the agreed price is discovered on-chain.",
     parties: {
       initiator: "Initiator. Sets the minimum price they will accept for the property.",
       counterparty: "Counterparty. Sets the maximum they are willing to offer.",

@@ -14,7 +14,6 @@ import RoomPage from "@/pages/RoomPage";
 import ResultPage from "@/pages/ResultPage";
 import ContractPage from "@/pages/ContractPage";
 import InboxPage from "@/pages/InboxPage";
-import DepositPage from "@/pages/DepositPage";
 import ProfilePage from "@/pages/ProfilePage";
 import CreateAuction from "@/pages/CreateAuction";
 import AuctionRoom from "@/pages/AuctionRoom";
@@ -35,7 +34,6 @@ function Router() {
       <Route path="/result/:id" component={ResultPage} />
       <Route path="/contract" component={ContractPage} />
       <Route path="/inbox" component={InboxPage} />
-      <Route path="/deposit/:id" component={DepositPage} />
       <Route path="/profile" component={ProfilePage} />
       {/* Wave 5: Multi-Party Auction Routes */}
       <Route path="/auction/create" component={CreateAuction} />

@@ -154,7 +154,6 @@ export default function NegotiatePage() {
         >
           <div className="flex items-center justify-center gap-2.5 mb-5">
             <FHEBadge label="Fhenix CoFHE" />
-            <FHEBadge variant="reineira" label="ReineiraOS" />
           </div>
           <h1 className="sf-display text-[28px] sm:text-[36px] md:text-[40px] text-foreground mb-2">How it Works</h1>
           <p className="text-[15px] text-foreground/45 max-w-lg mx-auto leading-relaxed">
@@ -351,21 +350,7 @@ export default function NegotiatePage() {
                 ))}
               </div>
 
-              {result.matched && (
-                <div className="apple-card p-5 mb-4" style={{ borderColor: "rgba(48,209,88,0.15)" }}>
-                  <div className="flex items-center gap-2.5 mb-1">
-                    <ShieldCheck className="w-4 h-4 text-[#30d158]" strokeWidth={2} />
-                    <h3 className="text-[14px] font-semibold text-foreground sf-headline">ReineiraOS ConfidentialEscrow</h3>
-                  </div>
-                  <p className="text-[12px] text-foreground/35 mb-3 leading-relaxed">
-                    Lock {displayPrice} in a confidential escrow where even the smart contract can't read the amount in plaintext.
-                  </p>
-                  <button className="btn-apple-secondary text-[13px] px-5 py-2 flex items-center gap-2">
-                    Create ConfidentialEscrow
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
+
             </motion.div>
           )}
         </AnimatePresence>

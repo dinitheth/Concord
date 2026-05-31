@@ -1,14 +1,11 @@
 import { useEffect, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, XCircle, ArrowRight, Lock, Unlock, RefreshCw, ExternalLink, AlertCircle, ShieldCheck, Coins, Banknote } from "lucide-react";
+import { CheckCircle2, XCircle, ArrowRight, Lock, Unlock, RefreshCw, ExternalLink, AlertCircle, ShieldCheck } from "lucide-react";
 import NavBar from "@/components/NavBar";
 import { getRoom, saveRoom, NEGOTIATION_TYPES, type Room } from "@/lib/concord";
 import {
   getExplorerTxUrl, BLIND_NEGOTIATION_ADDRESS, BLIND_NEGOTIATION_ABI,
-  CONFIDENTIAL_ESCROW_ADDRESS, CONFIDENTIAL_ESCROW_ABI,
-  escrowConfig, formatUsdc, getEscrowExplorerUrl,
-  EscrowStatus, type OnChainEscrow,
 } from "@/lib/contracts";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useWalletClient } from "wagmi";
 import { decryptForTx, initFHE } from "@/lib/fhe";
@@ -27,9 +24,7 @@ export default function ResultPage() {
   const [decryptError, setDecryptError] = useState("");
   const [accessDenied, setAccessDenied] = useState(false);
 
-  // ── Escrow write ────────────────────────────────────────────
-  const { writeContract: settleEscrow, data: settleTxHash, isPending: isSettling } = useWriteContract();
-  const { isLoading: isSettleLoading, isSuccess: isSettleSuccess } = useWaitForTransactionReceipt({ hash: settleTxHash });
+
 
   // ── Decrypt & Publish write ─────────────────────────────────
   const { writeContract: publishResult, data: publishTxHash, isPending: isPublishing } = useWriteContract();
@@ -47,7 +42,7 @@ export default function ResultPage() {
     setDecryptError("");
   }, [address, id]);
 
-  const [settleError, setSettleError] = useState("");
+
 
 
   // Read on-chain room info — includes status, published result data
@@ -62,31 +57,7 @@ export default function ResultPage() {
     },
   });
 
-  // Read on-chain escrow state for this room
-  const { data: escrowData, refetch: refetchEscrow } = useReadContract({
-    ...escrowConfig,
-    functionName: "getEscrow",
-    args: id.startsWith("0x") ? [id as `0x${string}`] : undefined,
-    query: { enabled: id.startsWith("0x"), refetchInterval: 5000 },
-  });
-  const escrow = escrowData as OnChainEscrow | undefined;
-  const escrowStatus: EscrowStatus = escrow ? Number(escrow.status) : EscrowStatus.None;
-  const hasActiveEscrow = escrowStatus === EscrowStatus.Deposited;
 
-  // Refetch escrow after settle tx
-  useEffect(() => {
-    if (isSettleSuccess) refetchEscrow();
-  }, [isSettleSuccess]);
-
-  const handleSettle = () => {
-    setSettleError("");
-    settleEscrow({
-      address: CONFIDENTIAL_ESCROW_ADDRESS,
-      abi: CONFIDENTIAL_ESCROW_ABI,
-      functionName: "settleEscrow",
-      args: [id as `0x${string}`],
-    });
-  };
 
   // Load local room data
   useEffect(() => {
@@ -191,16 +162,7 @@ export default function ResultPage() {
   const agreedPrice = room.result?.agreedPrice;
   const txHash = room.result?.txHash || room.txHash;
   const displayPrice = agreedPrice ? `$${agreedPrice}${meta.unit}` : null;
-  const isViewerBuyer = !!address && !!room && (
-    room.creatorRole === "buyer"
-      ? room.partyA?.address?.toLowerCase() === address.toLowerCase()
-      : room.partyB?.address?.toLowerCase() === address.toLowerCase()
-  );
-  const isViewerSeller = !!address && !!room && (
-    room.creatorRole === "buyer"
-      ? room.partyB?.address?.toLowerCase() === address.toLowerCase()
-      : room.partyA?.address?.toLowerCase() === address.toLowerCase()
-  );
+
 
   const handleDecryptAndPublish = async () => {
     if (!publicClient || !walletClient) {
@@ -430,105 +392,7 @@ export default function ResultPage() {
                 </div>
               </div>
 
-              {/* Settlement — Wave 4: ConfidentialEscrow */}
-              {(!isEncrypted && matched && escrowStatus !== EscrowStatus.None) && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7 }}
-                  className="apple-card p-5"
-                  style={{ borderColor: "rgba(10,132,255,0.2)" }}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-[12px] font-semibold text-foreground/40 uppercase tracking-widest">Escrow Settlement</p>
-                    {escrowStatus === EscrowStatus.Settled && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        style={{ background: "rgba(48,209,88,0.1)", color: "#30d158", border: "1px solid rgba(48,209,88,0.2)" }}>Settled</span>
-                    )}
-                    {escrowStatus === EscrowStatus.Refunded && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        style={{ background: "rgba(255,214,10,0.08)", color: "#ffd60a", border: "1px solid rgba(255,214,10,0.15)" }}>Refunded</span>
-                    )}
-                  </div>
 
-                  {/* Active escrow — show settle button */}
-                  {hasActiveEscrow && (
-                    <>
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[13px] text-foreground/40">Locked deposit</span>
-                          <span className="text-[13px] font-semibold text-foreground">{formatUsdc(escrow!.depositAmount)} USDC</span>
-                        </div>
-                        {agreedPrice && (
-                          <>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[13px] text-foreground/40">→ {isViewerSeller ? "You receive" : "Seller receives"}</span>
-                              <span className="text-[13px] font-semibold text-[#30d158]">{agreedPrice} USDC</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[13px] text-foreground/40">→ {isViewerBuyer ? "Your refund" : "Buyer refund"}</span>
-                              <span className="text-[13px] font-semibold text-[#0a84ff]">
-                                {formatUsdc(escrow!.depositAmount - BigInt(agreedPrice) * 1_000_000n)} USDC
-                              </span>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                      {settleError && <p className="text-[12px] text-[#ff453a] mb-2">{settleError}</p>}
-                      <button
-                        onClick={handleSettle}
-                        disabled={isSettling || isSettleLoading}
-                        className="btn-apple w-full py-3 text-[14px] flex items-center justify-center gap-2"
-                        style={{ background: "linear-gradient(135deg, #0a84ff, #30d158)" }}
-                      >
-                        {isSettling || isSettleLoading ? (
-                          <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Settling…</>
-                        ) : (
-                          <><Coins className="w-4 h-4" /> Settle Escrow</>
-                        )}
-                      </button>
-                      {settleTxHash && (
-                        <a href={getExplorerTxUrl(settleTxHash)} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-1 text-[11px] text-[#0a84ff] mt-2 hover:underline">
-                          <ExternalLink className="w-3 h-3" /> View transaction
-                        </a>
-                      )}
-                    </>
-                  )}
-
-                  {/* Settled */}
-                  {escrowStatus === EscrowStatus.Settled && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 mb-3">
-                        <CheckCircle2 className="w-4 h-4 text-[#30d158]" />
-                        <p className="text-[13px] font-semibold text-foreground">Settlement complete</p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[13px] text-foreground/40">{isViewerSeller ? "You received" : "Seller received"}</span>
-                        <span className="text-[13px] font-semibold text-[#30d158]">{formatUsdc(escrow!.agreedAmount)} USDC</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[13px] text-foreground/40">{isViewerBuyer ? "You were refunded" : "Buyer refunded"}</span>
-                        <span className="text-[13px] font-semibold text-[#0a84ff]">{formatUsdc(escrow!.depositAmount - escrow!.agreedAmount)} USDC</span>
-                      </div>
-                      {settleTxHash && (
-                        <a href={getExplorerTxUrl(settleTxHash)} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-[11px] text-[#0a84ff] mt-2 hover:underline">
-                          <ExternalLink className="w-3 h-3" /> View settlement transaction
-                        </a>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Refunded (no match) */}
-                  {escrowStatus === EscrowStatus.Refunded && (
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-[#ffd60a]" />
-                      <p className="text-[13px] text-foreground/60">Full deposit refunded. Zero information leaked.</p>
-                    </div>
-                  )}
-                </motion.div>
-              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <button

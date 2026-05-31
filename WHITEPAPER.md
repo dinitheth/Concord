@@ -239,9 +239,6 @@ Returns the FHE ciphertext handles (`euint64 encAgreedPrice`, `ebool encMatched`
 ├───────────────┼─────────────────────────────────────────────────────┤
 │  5. Result    │  On-chain status set to Settled. Both parties can    │
 │               │  view the result via the Concord frontend.           │
-├───────────────┼─────────────────────────────────────────────────────┤
-│  6. Settlement│  Future: ConfidentialEscrow locks the agreed amount  │
-│  (Coming Soon)│  in encrypted escrow powered by CoFHE.               │
 └───────────────┴─────────────────────────────────────────────────────┘
 ```
 

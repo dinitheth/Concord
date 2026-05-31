@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, Check, Code2, ExternalLink, Shield, Zap } from "lucide-react";
+import { Copy, Check, Code2, ExternalLink, Zap } from "lucide-react";
 import NavBar from "@/components/NavBar";
 import FHEBadge from "@/components/FHEBadge";
 
@@ -19,7 +19,6 @@ import "@fhenixprotocol/cofhe-contracts/access/Permissioned.sol";
  *
  *      Network: Base Sepolia (CoFHE Testnet)
  *      Deployed: 0x28c80aDC6404ede43C6127BfA2F3c39A7A9b4569
- *      ReineiraOS Escrow: 0xC4333F84F5034D8691CB95f068def2e3B6DC60Fa
  */
 contract BlindNegotiation is Permissioned {
 
@@ -162,43 +161,6 @@ contract BlindNegotiation is Permissioned {
     }
 }`;
 
-const REINEIRA_INTEGRATION = `// ReineiraOS Integration — Auto-settle on match
-import { ReineiraSDK, walletClientToSigner } from "@reineira-os/sdk";
-
-async function createConfidentialEscrow(
-  agreedPrice: number,
-  beneficiary: string,
-  walletClient: any
-) {
-  // Initialize Reineira SDK with Fhenix CoFHE support
-  const sdk = ReineiraSDK.create({
-    network: "testnet",
-    signer: walletClientToSigner(walletClient),
-    coordinatorUrl: "https://coordinator.reineira.io",
-    onFHEInit: (status) => console.log("FHE:", status),
-  });
-
-  await sdk.initialize();
-
-  // Create ConfidentialEscrow — amount encrypted via CoFHE
-  // Neither the escrow contract nor any observer can see the amount
-  const escrow = await sdk.escrow
-    .create()
-    .amount(agreedPrice)           // Encrypted with FHE before submission
-    .beneficiary(beneficiary)      // Encrypted beneficiary address (eaddress)
-    .gate("0x0000...0000")        // No condition = unconditional release
-    .execute();
-
-  console.log("Escrow ID:", escrow.escrowId);
-  console.log("Amount encrypted on-chain as euint64");
-
-  // Fund the escrow (deposits USDC, wraps to ConfidentialUSDC)
-  await sdk.escrow.fund(escrow.escrowId, agreedPrice);
-
-  // Beneficiary redeems (Gate check → funds released)
-  await sdk.escrow.redeem(escrow.escrowId);
-}`;
-
 const FRONTEND_USAGE = `// Client-side FHE encryption with @cofhe/sdk (new API)
 import { createCofheConfig, createCofheClient } from "@cofhe/sdk/web";
 import { Encryptable, FheTypes } from "@cofhe/sdk";
@@ -227,12 +189,11 @@ const { decryptedValue, signature } = await client
 // Then call contract.publishResult(roomId, matched, agreedPrice)`;
 
 export default function ContractPage() {
-  const [activeTab, setActiveTab] = useState<"contract" | "reineira" | "frontend">("contract");
+  const [activeTab, setActiveTab] = useState<"contract" | "frontend">("contract");
   const [copied, setCopied] = useState(false);
 
   const codeMap = {
     contract: FULL_CONTRACT,
-    reineira: REINEIRA_INTEGRATION,
     frontend: FRONTEND_USAGE,
   };
 
@@ -249,19 +210,17 @@ export default function ContractPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <div className="flex items-center gap-2 mb-3">
             <FHEBadge label="Fhenix CoFHE" />
-            <FHEBadge variant="reineira" label="ReineiraOS" />
           </div>
           <h1 className="text-3xl font-bold mb-2">Smart Contract</h1>
           <p className="text-muted-foreground">
-            The full <code className="text-primary">BlindNegotiation.sol</code> contract, ReineiraOS escrow integration,
+            The full <code className="text-primary">BlindNegotiation.sol</code> contract
             and frontend SDK usage. All code is open source.
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           {[
             { key: "contract" as const, label: "BlindNegotiation.sol", icon: Code2, color: "text-primary" },
-            { key: "reineira" as const, label: "ReineiraOS Escrow", icon: Shield, color: "text-accent" },
             { key: "frontend" as const, label: "Frontend SDK", icon: Zap, color: "text-yellow-400" },
           ].map(tab => (
             <button
@@ -286,9 +245,7 @@ export default function ContractPage() {
               <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
               <div className="w-3 h-3 rounded-full bg-green-500/60" />
               <span className="text-xs text-muted-foreground ml-2 font-mono">
-                {activeTab === "contract" ? "BlindNegotiation.sol" :
-                 activeTab === "reineira" ? "reineira-integration.ts" :
-                 "cofhe-client.ts"}
+                {activeTab === "contract" ? "BlindNegotiation.sol" : "cofhe-client.ts"}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -317,20 +274,12 @@ export default function ContractPage() {
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="card-dark p-4">
-            <h3 className="text-sm font-semibold mb-2 text-primary">FHE Operations Used</h3>
-            <div className="space-y-1.5 text-xs font-mono">
+        <div className="mt-6">
+          <div className="card-dark p-4 max-w-md mx-auto">
+            <h3 className="text-sm font-semibold mb-2 text-primary text-center">FHE Operations Used</h3>
+            <div className="grid grid-cols-2 gap-2 text-xs font-mono text-center">
               {["FHE.asEuint64()", "FHE.asEaddress()", "FHE.gte(a, b)", "FHE.add(a, b)", "FHE.div(a, 2)", "FHE.select(bool, a, b)", "FHE.allow()", "FHE.allowPublic()"].map(op => (
                 <div key={op} className="text-primary">{op}</div>
-              ))}
-            </div>
-          </div>
-          <div className="card-dark p-4">
-            <h3 className="text-sm font-semibold mb-2 text-accent">ReineiraOS Modules</h3>
-            <div className="space-y-1.5 text-xs font-mono">
-              {["sdk.escrow.create()", "sdk.escrow.fund()", "sdk.escrow.redeem()", "ConfidentialEscrow", "ConfidentialUSDC", "IConditionResolver", "sdk.usdc(amount)", "walletClientToSigner()"].map(op => (
-                <div key={op} className="text-accent">{op}</div>
               ))}
             </div>
           </div>
