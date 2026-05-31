@@ -3,7 +3,6 @@ pragma solidity ^0.8.26;
 
 import "forge-std/Script.sol";
 import "../src/BlindNegotiation.sol";
-import "../src/ConfidentialEscrow.sol";
 import "../src/MultiPartyAuction.sol";
 
 contract DeployAll is Script {
@@ -17,14 +16,7 @@ contract DeployAll is Script {
         BlindNegotiation negotiation = new BlindNegotiation();
         console.log("BlindNegotiation deployed at:", address(negotiation));
 
-        // 2. Deploy ConfidentialEscrow pointing at BlindNegotiation
-        ConfidentialEscrow escrow = new ConfidentialEscrow(
-            USDC_BASE_SEPOLIA,
-            address(negotiation)
-        );
-        console.log("ConfidentialEscrow deployed at:", address(escrow));
-
-        // 3. Deploy MultiPartyAuction
+        // 2. Deploy MultiPartyAuction
         MultiPartyAuction auction = new MultiPartyAuction();
         console.log("MultiPartyAuction deployed at:", address(auction));
 
