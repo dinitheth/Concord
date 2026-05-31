@@ -146,7 +146,7 @@ export default function AuctionRoom() {
   const maxBid = auction?.maxBidders || 5;
   const isBiddingOpen = auction?.status === "bidding";
   const isDeadlinePassed = auction ? Date.now() > auction.deadline : false;
-  const canCompute = (isDeadlinePassed || currentBids >= maxBid) && isBiddingOpen;
+  const canCompute = isSeller && (isDeadlinePassed || currentBids >= maxBid) && isBiddingOpen;
   const isSettled = auction?.status === "settled";
 
   // Handle bid submission
@@ -266,19 +266,38 @@ export default function AuctionRoom() {
 
   // Navigate to result if settled
   if (isSettled) {
-    return (
-      <div className="min-h-screen bg-background">
-        <NavBar />
-        <div className="pt-20 pb-16 px-6 max-w-xl mx-auto text-center">
-          <CheckCircle2 className="w-12 h-12 text-[#30d158] mx-auto mb-4" />
-          <h2 className="text-[20px] font-bold text-foreground mb-2">FHE Computation Complete</h2>
-          <p className="text-[13px] text-foreground/40 mb-6">The encrypted tournament has finished. View the results.</p>
-          <button onClick={() => navigate(`/auction/result/${id}`)} className="btn-apple px-8 py-3 text-[14px] inline-flex items-center gap-2">
-            View Results <ArrowRight className="w-4 h-4" />
-          </button>
+    const isResultPublished = auction.result && !(auction.result as any).isEncrypted;
+    
+    if (isSeller || isResultPublished) {
+      return (
+        <div className="min-h-screen bg-background">
+          <NavBar />
+          <div className="pt-20 pb-16 px-6 max-w-xl mx-auto text-center">
+            <CheckCircle2 className="w-12 h-12 text-[#30d158] mx-auto mb-4" />
+            <h2 className="text-[20px] font-bold text-foreground mb-2">FHE Computation Complete</h2>
+            <p className="text-[13px] text-foreground/40 mb-6">
+              {isResultPublished ? "The auction results are published. View the details." : "The encrypted tournament has finished. View results to decrypt and publish."}
+            </p>
+            <button onClick={() => navigate(`/auction/result/${id}`)} className="btn-apple px-8 py-3 text-[14px] inline-flex items-center gap-2">
+              View Results <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </div>
-    );
+      );
+    } else {
+      return (
+        <div className="min-h-screen bg-background">
+          <NavBar />
+          <div className="pt-20 pb-16 px-6 max-w-xl mx-auto text-center">
+            <Lock className="w-12 h-12 text-[#a78bfa]/50 mx-auto mb-4 animate-pulse" />
+            <h2 className="text-[20px] font-bold text-foreground mb-2">FHE Computation Complete</h2>
+            <p className="text-[13px] text-foreground/40 leading-relaxed max-w-sm mx-auto mb-6">
+              The encrypted computations are finished. Waiting for the auction owner (seller) to decrypt and publish the results to reveal the winner.
+            </p>
+          </div>
+        </div>
+      );
+    }
   }
 
   return (
@@ -428,9 +447,16 @@ export default function AuctionRoom() {
                   )}
                 </div>
               ) : (
-                <div className="flex items-center justify-center gap-3 py-3">
-                  <div className="w-4 h-4 border-2 border-[#ff9500]/30 border-t-[#ff9500] rounded-full animate-spin" />
-                  <span className="text-[13px] text-foreground/50">{encryptStep}</span>
+                <div className="flex flex-col items-center justify-center gap-3 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 border-2 border-[#ff9500]/30 border-t-[#ff9500] rounded-full animate-spin" />
+                    <span className="text-[13px] text-foreground/50">{encryptStep}</span>
+                  </div>
+                  {submitStatus === "encrypting" && (
+                    <p className="text-[11px] text-foreground/30 text-center max-w-sm leading-relaxed mt-1">
+                      First-time FHE setup downloads cryptoprove modules (~20MB) and may take up to 2-3 minutes. Please do not close or reload this page.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

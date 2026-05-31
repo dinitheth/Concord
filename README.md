@@ -129,7 +129,7 @@ euint64 agreedPrice = FHE.div(FHE.add(floor, bestBid), 2);
 ### BlindNegotiation.sol (1-on-1)
 
 **Network:** Base Sepolia  
-**Address:** `0xd7FA8ad77cfAa55674af496088f8D3723F9ff402`
+**Address:** `0x46BC52321a0B3C886Fccc2db88142727E44D3B7D`
 
 ```solidity
 contract BlindNegotiation {
@@ -161,7 +161,7 @@ contract BlindNegotiation {
 ### MultiPartyAuction.sol (Sealed-Bid) — Wave 5
 
 **Network:** Base Sepolia  
-**Address:** `0xe0A48263eeEa990Dd73CE9477Ef776f5D29a4c60`
+**Address:** `0xE21E40C8c96e22f019De2d982428a0D782cb6136`
 
 ```solidity
 contract MultiPartyAuction {
@@ -297,11 +297,9 @@ This property is enforced cryptographically — not by policy or trust.
 
 ## Deployed Contracts (Base Sepolia)
 
-| Contract | Address |
-|---|---|
-| `BlindNegotiation` | [`0xd7FA8ad77cfAa55674af496088f8D3723F9ff402`](https://sepolia.basescan.org/address/0xd7FA8ad77cfAa55674af496088f8D3723F9ff402) |
-| `MultiPartyAuction` | [`0xe0A48263eeEa990Dd73CE9477Ef776f5D29a4c60`](https://sepolia.basescan.org/address/0xe0A48263eeEa990Dd73CE9477Ef776f5D29a4c60) |
-| `ConfidentialEscrow` | [`0x4B5c130ad2BD8A9CDfa062E2B9d7a655Db757F3A`](https://sepolia.basescan.org/address/0x4B5c130ad2BD8A9CDfa062E2B9d7a655Db757F3A) |
+| `BlindNegotiation` | [`0x46BC52321a0B3C886Fccc2db88142727E44D3B7D`](https://sepolia.basescan.org/address/0x46BC52321a0B3C886Fccc2db88142727E44D3B7D) |
+| `MultiPartyAuction` | [`0xE21E40C8c96e22f019De2d982428a0D782cb6136`](https://sepolia.basescan.org/address/0xE21E40C8c96e22f019De2d982428a0D782cb6136) |
+| `ConfidentialEscrow` | [`0x1f818B5483C91CF0D1741bCe53A6EaE8FF617B1c`](https://sepolia.basescan.org/address/0x1f818B5483C91CF0D1741bCe53A6EaE8FF617B1c) |
 | `USDC` (Base Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 
 ---

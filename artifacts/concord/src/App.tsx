@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useAccount, useSwitchChain, useChainId } from "wagmi";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -45,6 +47,17 @@ function Router() {
 }
 
 function App() {
+  const { isConnected } = useAccount();
+  const { switchChain } = useSwitchChain();
+  const chainId = useChainId();
+
+  useEffect(() => {
+    if (isConnected && chainId !== 84532) {
+      console.log("Switching chain to Base Sepolia (84532)...");
+      switchChain({ chainId: 84532 });
+    }
+  }, [isConnected, chainId, switchChain]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

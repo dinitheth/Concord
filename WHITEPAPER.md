@@ -4,7 +4,7 @@
 **Version:** 3.0.0  
 **Date:** May 2026  
 **Network:** Base Sepolia (Fhenix CoFHE coprocessor)  
-**Contract:** `0xd7FA8ad77cfAa55674af496088f8D3723F9ff402`  
+**Contract:** `0x46BC52321a0B3C886Fccc2db88142727E44D3B7D`  
 **Built with:** Base & Fhenix CoFHE
 
 ---
@@ -113,7 +113,7 @@ euint64 agreed = FHE.select(matched, midpoint, FHE.asEuint64(0)); // Encrypted r
 
 ### 3.1 BlindNegotiation.sol
 
-Deployed at `0xd7FA8ad77cfAa55674af496088f8D3723F9ff402` on Base Sepolia.
+Deployed at `0x46BC52321a0B3C886Fccc2db88142727E44D3B7D` on Base Sepolia.
 
 ```solidity
 // SPDX-License-Identifier: MIT

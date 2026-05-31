@@ -840,6 +840,16 @@ export const MULTI_PARTY_AUCTION_ABI = [
       { name: "timestamp", type: "uint256", indexed: false },
     ],
   },
+  {
+    type: "event",
+    name: "AuctionInviteSent",
+    inputs: [
+      { name: "auctionId", type: "bytes32", indexed: true },
+      { name: "sender", type: "address", indexed: true },
+      { name: "recipient", type: "address", indexed: true },
+      { name: "timestamp", type: "uint256", indexed: false },
+    ],
+  },
 ] as const;
 
 export enum AuctionStatus {
