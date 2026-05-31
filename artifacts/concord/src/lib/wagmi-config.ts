@@ -51,9 +51,8 @@ export const wagmiConfig = createConfig(
     chains: [baseSepolia, mainnet],
     transports: {
       [baseSepolia.id]: fallback([
-        http("https://base-sepolia-rpc.publicnode.com"),
-        http("https://base-sepolia.drpc.org"),
         http("https://sepolia.base.org"),
+        http("https://base-sepolia-rpc.publicnode.com"),
       ]),
       [mainnet.id]: fallback([
         http("https://cloudflare-eth.com"),
