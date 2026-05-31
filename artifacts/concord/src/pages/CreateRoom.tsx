@@ -277,6 +277,8 @@ export default function CreateRoom() {
         // User cancelled the tx in their wallet — just reset silently
       } else if (error?.message?.includes("ZK_VERIFY_FAILED")) {
         alert("FHE proof verification failed. This may be a temporary network issue. Please try again.");
+      } else if (msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("rate-limit") || msg.toLowerCase().includes("rate limited")) {
+        alert("Transaction Failed: Your wallet is connected to a rate-limited RPC node (base-sepolia.drpc.org). Please open MetaMask, edit your Base Sepolia network configuration, and change the New RPC URL to: https://sepolia.base.org");
       } else {
         alert(`Encryption or room creation failed: ${msg.length > 200 ? msg.slice(0, 200) + "…" : msg}`);
       }

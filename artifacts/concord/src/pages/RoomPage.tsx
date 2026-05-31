@@ -461,6 +461,8 @@ export default function RoomPage() {
             ? "FHE encryption timed out. The CoFHE network may be congested. Please try again."
             : msg.includes("User rejected") || msg.includes("user rejected")
             ? "Transaction was rejected in your wallet."
+            : msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("rate-limit") || msg.toLowerCase().includes("rate limited")
+            ? "Your wallet is connected to a rate-limited RPC (base-sepolia.drpc.org). Please open MetaMask network settings and change your RPC URL to: https://sepolia.base.org"
             : `Encryption failed: ${msg.length > 100 ? msg.slice(0, 100) + "…" : msg}`
         );
         setSubmitStatus("error");
