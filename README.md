@@ -1,9 +1,9 @@
 # Concord — Blind Negotiation & Sealed-Bid Auction Protocol
 
-> **Private price discovery powered by Fully Homomorphic Encryption.**
-> Built with [Base](https://base.org) & [Fhenix CoFHE](https://fhenix.io).
+> **Concord's absolute first priority is Privacy Architecture.**
+> Private price discovery powered by Fully Homomorphic Encryption, built with [Base](https://base.org) & [Fhenix CoFHE](https://fhenix.io).
 
-Concord lets parties discover whether they have a deal — and at what price — without revealing their private numbers. Whether it's a 1-on-1 negotiation or a multi-party sealed-bid auction, every price is encrypted in the browser using the CoFHE SDK before it touches the blockchain. Smart contracts compare encrypted numbers and compute fair midpoints, all while the values remain fully encrypted ciphertext.
+Concord is a fully confidential negotiation and sealed-bid auction protocol that lets parties discover whether they have a deal — and at what price — without either side ever revealing their private valuations to the counterparty, observers, or the platform itself. Whether it's a 1-on-1 negotiation or a multi-party sealed-bid auction, every price is encrypted in the browser using the CoFHE SDK before it touches the blockchain. Smart contracts compare encrypted numbers and compute fair midpoints, all while the values remain fully encrypted ciphertext.
 
 ---
 

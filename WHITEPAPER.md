@@ -11,7 +11,7 @@
 
 ## Abstract
 
-Concord is a fully homomorphic encryption (FHE) powered blind negotiation protocol that enables two counterparties to discover whether a deal exists — and at what price — without either party revealing their private reservation price. Using Fhenix CoFHE as the computation layer on Base Sepolia, all price data remains encrypted throughout the entire negotiation lifecycle. The protocol is fully trustless: no external messaging services, oracles, or intermediaries are required.
+Concord's absolute first priority is **Privacy Architecture**. It is a fully homomorphic encryption (FHE) powered blind negotiation and multi-party sealed-bid auction protocol that enables counterparties to discover whether a deal exists — and at what price — without ever revealing their private reservation prices. Using Fhenix CoFHE as the computation layer on Base Sepolia, all price data remains encrypted throughout the entire negotiation lifecycle. The protocol is fully trustless: no external messaging services, oracles, or intermediaries are required.
 
 ---
 
