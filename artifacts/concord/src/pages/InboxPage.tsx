@@ -47,12 +47,13 @@ function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: stri
   const [decrypted, setDecrypted] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
   const [copied, setCopied] = useState(false);
-  const code = roomIdToCode(inv.roomId);
+  const [code, setCode] = useState("");
 
   const handleDecrypt = async () => {
     setDecrypting(true);
     // Simulate decrypt animation (250ms)
     await new Promise(r => setTimeout(r, 900));
+    setCode(roomIdToCode(inv.roomId));
     setDecrypting(false);
     setDecrypted(true);
   };

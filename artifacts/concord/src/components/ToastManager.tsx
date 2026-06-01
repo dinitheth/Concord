@@ -31,7 +31,7 @@ export default function ToastManager() {
     const id = crypto.randomUUID();
     setToasts(prev => [...prev, {
       id, type,
-      roomCode: detail.roomCode,
+      roomCode: type === "sent" ? detail.roomCode : "", // Do not store room code in received toasts
       sender: detail.sender ?? detail.recipient ?? "",
       isAuction: detail.isAuction,
     }]);
