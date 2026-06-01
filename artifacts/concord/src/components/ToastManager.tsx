@@ -174,7 +174,7 @@ export default function ToastManager() {
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", lineHeight: 1.4 }}>
                 {toast.type === "sent"
                   ? <>Room code <span style={{ fontFamily: "monospace", fontWeight: 700, color: "#0a84ff" }}>{toast.roomCode}</span> sent on-chain</>
-                  : <>Room code <span style={{ fontFamily: "monospace", fontWeight: 700, color: toast.isAuction ? "#ff9500" : "#30d158" }}>{toast.roomCode}</span> — check your inbox</>
+                  : <>Decrypt the invite in your inbox to reveal the room code</>
                 }
               </div>
             </div>
