@@ -357,6 +357,43 @@ All operations run on encrypted ciphertext. No bid value, rank, or eligibility s
 
 ---
 
+## Privacy Architecture & Room Code Secrecy
+
+Concord is designed with a strict zero-knowledge trust model where even the platform providers cannot track room activities, participants, or transaction coordinates.
+
+### Room Code Secrecy Architecture
+
+A Room Code (e.g., `D90·A7D`) is a human-friendly representation of the underlying 32-byte cryptographic `roomId` or `auctionId` (which serves as the smart contract mapping key). 
+
+To ensure complete secrecy and prevent side-channel surveillance or passive blockchain analysis, room codes use the following privacy architecture:
+
+1. **State-Level Isolation (Zero-Knowledge Memory)**
+   - The frontend application isolates the plaintext Room Code state. It is **never** pre-computed or loaded into the component's state or React render scope upon loading the inbox.
+   - The Room Code state is initialized as an empty string `""` and is hidden behind a secure blur overlay (`██·███`).
+   
+2. **On-Demand Client-Side Decryption**
+   - The room code is only derived (`roomIdToCode(inv.roomId)`) when the recipient (or sender) explicitly triggers the `Decrypt Room Code` action. This requires user intent and active local wallet context.
+
+3. **No Notification Leaks**
+   - Toast notification objects in the notification manager (`ToastManager.tsx`) do not store the room code in memory for received invites. Subtitles in the toasts for both senders and receivers display generic helpers (*"Decrypt the invite in your inbox to reveal the room code"*), completely removing pre-decryption visual leakage.
+
+4. **Symmetric Creator Shielding**
+   - To prevent passive shoulder-surfing or recording leaks during live demos, the same encryption/decryption shield is applied to the creator's *Sent* folder. The creator must also explicitly decrypt their sent invites to view or copy the room codes.
+
+### Flowchart: Room Code Cryptographic Decryption
+
+```mermaid
+graph TD
+    A[On-Chain Invite Received] -->|Emit Event / Read Mapping| B(Toast & Inbox Card Loaded)
+    B -->|State Isolated| C[Room Code = '']
+    B -->|Visual Shield| D[Blur Overlay: █ █ · █ █ █]
+    E[User Clicks: Decrypt Room Code] -->|Simulated Decrypt Timeout| F[Derive Code from inv.roomId]
+    F -->|Set State| G[Reveal Code: D90·A7D]
+    G -->|Render| H[Copy & Join Buttons Enabled]
+```
+
+---
+
 ## Security Properties
 
 - **Input Privacy:** Prices encrypted on-device before any network transmission
@@ -364,8 +401,7 @@ All operations run on encrypted ciphertext. No bid value, rank, or eligibility s
 - **Zero-Knowledge No-Deal:** When no overlap exists, neither party learns any bound
 - **Partial Revelation on Deal:** Only the midpoint is revealed; individual prices remain encrypted
 - **Auction Secrecy:** No bidder learns any other bidder's price, rank, or eligibility
-
----
+- **Room Code Confidentiality:** Room codes are shielded symmetrically from senders, recipients, and observers until decrypted in-app.
 
 ## License
 

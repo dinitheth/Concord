@@ -31,7 +31,7 @@ export default function ToastManager() {
     const id = crypto.randomUUID();
     setToasts(prev => [...prev, {
       id, type,
-      roomCode: type === "sent" ? detail.roomCode : "", // Do not store room code in received toasts
+      roomCode: "", // Never store room code in toasts to guarantee privacy
       sender: detail.sender ?? detail.recipient ?? "",
       isAuction: detail.isAuction,
     }]);
@@ -172,10 +172,7 @@ export default function ToastManager() {
                   : (toast.isAuction ? "On-Chain auction invite received" : "On-Chain invite received")}
               </div>
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", lineHeight: 1.4 }}>
-                {toast.type === "sent"
-                  ? <>Room code <span style={{ fontFamily: "monospace", fontWeight: 700, color: "#0a84ff" }}>{toast.roomCode}</span> sent on-chain</>
-                  : <>Decrypt the invite in your inbox to reveal the room code</>
-                }
+                Decrypt the invite in your inbox to reveal the room code
               </div>
             </div>
 

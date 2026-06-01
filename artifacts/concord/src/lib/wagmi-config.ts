@@ -51,6 +51,7 @@ export const wagmiConfig = createConfig(
     chains: [baseSepolia, mainnet],
     transports: {
       [baseSepolia.id]: fallback([
+        http("https://base-sepolia.g.alchemy.com/v2/3F7lInImL61FcQum9FYno"),
         http("https://sepolia.base.org"),
         http("https://base-sepolia-rpc.publicnode.com"),
       ]),

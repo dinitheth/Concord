@@ -43,7 +43,15 @@ function truncAddr(addr: string): string {
 }
 
 // ── Decryptable Invite Card ─────────────────────────────────────
-function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: string, code: string, isAuction: boolean) => void }) {
+function InviteCard({ 
+  inv, 
+  onJoin, 
+  isSent = false 
+}: { 
+  inv: OnChainInvite; 
+  onJoin: (roomId: string, code: string, isAuction: boolean) => void;
+  isSent?: boolean;
+}) {
   const [decrypted, setDecrypted] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -90,12 +98,14 @@ function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: stri
           </div>
           <div>
             <div className="text-[13px] font-semibold text-foreground">
-              {inv.isAuction ? "🔨 Auction" : ""} {NEG_TYPE_LABELS[inv.negotiationType % 10] ?? "Negotiation"} Invite
+              {inv.isAuction ? "🔨 Auction" : ""} {NEG_TYPE_LABELS[inv.negotiationType % 10] ?? "Negotiation"} {isSent ? "Invite Sent" : "Invite"}
             </div>
             {inv.isAuction && (
               <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: "rgba(255,149,0,0.12)", color: "#ff9500" }}>Sealed-Bid</span>
             )}
-            <div className="text-[11px] text-foreground/35 font-mono">from {truncAddr(inv.sender)}</div>
+            <div className="text-[11px] text-foreground/35 font-mono">
+              {isSent ? "encrypted on Base Sepolia" : `from ${truncAddr(inv.sender)}`}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1 text-foreground/25 shrink-0">
@@ -176,8 +186,8 @@ function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: stri
       {/* Description */}
       <p className="text-[12px] text-foreground/35 mb-4 leading-relaxed">
         {decrypted
-          ? "Room code revealed. Copy it and paste at /join to submit your encrypted ceiling price."
-          : "You've received an on-chain negotiation invite. Decrypt it to reveal the room code."
+          ? (isSent ? "Room code revealed. Copy it and share it with your counterparty manually." : "Room code revealed. Copy it and paste at /join to submit your encrypted price.")
+          : (isSent ? "You've sent an on-chain invite. Decrypt it to reveal the room code." : "You've received an on-chain negotiation invite. Decrypt it to reveal the room code.")
         }
       </p>
 
@@ -210,7 +220,7 @@ function InviteCard({ inv, onJoin }: { inv: OnChainInvite; onJoin: (roomId: stri
             onClick={() => onJoin(inv.roomId, code, !!inv.isAuction)}
             className="flex-1 btn-apple py-3 text-[13px] flex items-center justify-center gap-2"
           >
-            Join Room
+            {isSent ? (inv.isAuction ? "Open Auction Room" : "Open Your Room") : "Join Room"}
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -486,57 +496,7 @@ export default function InboxPage() {
                 <div className="space-y-3">
                   <span className="text-[11px] text-foreground/25 block mb-1">{sent.length} sent</span>
                   {sent.map((inv, i) => (
-                    <motion.div
-                      key={`sent-${inv.roomId}-${i}`}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="apple-card p-5"
-                    >
-                      <div className="flex items-start justify-between gap-3 mb-4">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                            style={{ background: "rgba(48,209,88,0.1)", border: "1px solid rgba(48,209,88,0.2)" }}
-                          >
-                            <Send className="w-4 h-4 text-[#30d158]" />
-                          </div>
-                          <div>
-                            <div className="text-[13px] font-semibold text-foreground">
-                              {NEG_TYPE_LABELS[inv.negotiationType % 10] ?? "Negotiation"} — Invite Sent
-                            </div>
-                            <div className="text-[11px] text-foreground/35 font-mono">encrypted on Base Sepolia</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="flex items-center gap-1.5">
-                            <CheckCheck className="w-3.5 h-3.5 text-[#30d158]" />
-                            <span className="text-[11px] text-[#30d158] font-medium">On-Chain</span>
-                          </div>
-                          <div className="flex items-center gap-1 text-foreground/25">
-                            <Clock className="w-3 h-3" />
-                            <span className="text-[11px]">{timeAgo(inv.timestamp)}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        className="rounded-xl px-4 py-3 mb-4"
-                        style={{ background: "var(--subtle-bg)", border: "1px solid var(--card-border-color)" }}
-                      >
-                        <p className="text-[10px] font-bold text-foreground/25 uppercase tracking-widest mb-1">Room Code</p>
-                        <div className="font-mono text-[26px] font-bold text-foreground tracking-widest">
-                          {roomIdToCode(inv.roomId)}
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => navigate(inv.isAuction ? `/auction/${inv.roomId}` : `/room/${inv.roomId}`)}
-                        className="btn-ghost w-full py-3 text-[13px] flex items-center justify-center gap-2"
-                      >
-                        {inv.isAuction ? "Open Auction Room" : "Open Your Room"}
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </motion.div>
+                    <InviteCard key={`sent-${inv.roomId}-${i}`} inv={inv} onJoin={handleJoin} isSent={true} />
                   ))}
                 </div>
               )}
