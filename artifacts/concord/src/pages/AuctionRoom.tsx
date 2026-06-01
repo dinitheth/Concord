@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Zap, CheckCircle2, ArrowRight, Wallet, ShieldCheck, Users, AlertCircle, RefreshCw, Gavel, Clock, Send } from "lucide-react";
+import { Lock, Zap, CheckCircle2, ArrowRight, Wallet, ShieldCheck, Users, AlertCircle, RefreshCw, Gavel, Clock, Send, FileText, X } from "lucide-react";
 import { useAccount, usePublicClient, useWalletClient, useReadContract } from "wagmi";
 import { useModal } from "connectkit";
 import NavBar from "@/components/NavBar";
@@ -37,6 +37,7 @@ export default function AuctionRoom() {
   const [encryptError, setEncryptError] = useState("");
   const [computeStatus, setComputeStatus] = useState<"idle" | "computing" | "done">("idle");
   const [timeDisplay, setTimeDisplay] = useState("");
+  const [showDealDetails, setShowDealDetails] = useState(false);
 
   // Read on-chain auction info
   const { data: onChainInfo, isLoading: isOnChainLoading } = useReadContract({
@@ -316,6 +317,28 @@ export default function AuctionRoom() {
                 <span className="text-[10px] font-bold text-[#ff9500] uppercase tracking-wider">{meta.label} Auction</span>
               </div>
               <h1 className="text-[22px] font-bold text-foreground">{auction.dealName || "Sealed-Bid Auction"}</h1>
+              <button
+                onClick={() => setShowDealDetails(true)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "rgba(10,132,255,0.12)",
+                  border: "1px solid rgba(10,132,255,0.25)",
+                  padding: "4px 10px",
+                  borderRadius: 6,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#5ac8fa",
+                  marginTop: 8,
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+                className="hover:bg-[rgba(10,132,255,0.18)]"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                View Deal Details
+              </button>
             </div>
           </div>
 
@@ -489,6 +512,164 @@ export default function AuctionRoom() {
           <FHEBadge />
         </motion.div>
       </div>
+
+      {/* DEAL DETAILS MODAL */}
+      <AnimatePresence>
+        {showDealDetails && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="deal-details-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDealDetails(false)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 100,
+                background: "rgba(0, 0, 0, 0.6)",
+                backdropFilter: "blur(12px)",
+              }}
+            />
+
+            {/* Centering Wrapper */}
+            <div style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 101,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
+              padding: 20,
+            }}>
+              {/* Modal Container */}
+              <motion.div
+                key="deal-details-modal"
+                initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 360, damping: 28 }}
+                style={{
+                  width: "100%",
+                  maxWidth: 550,
+                  maxHeight: "85vh",
+                  overflowY: "auto",
+                  background: "rgba(28, 28, 30, 0.8)",
+                  backdropFilter: "blur(20px)",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderRadius: 24,
+                  padding: "24px 24px 28px",
+                  boxShadow: "0 24px 60px rgba(0, 0, 0, 0.6)",
+                  pointerEvents: "auto",
+                  color: "hsl(var(--foreground))",
+                }}
+              >
+                {/* Header */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgba(255,149,0,0.12)", border: "1px solid rgba(255,149,0,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <FileText style={{ width: 16, height: 16, color: "#ff9500" }} />
+                    </div>
+                    <div>
+                      <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>Deal Details</h2>
+                      <p style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", margin: 0 }}>On-chain auction context</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowDealDetails(false)}
+                    style={{
+                      background: "rgba(255,255,255,0.05)",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: 28,
+                      height: 28,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      color: "hsl(var(--muted-foreground))",
+                      transition: "all 0.2s",
+                    }}
+                    className="hover:bg-white/10 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div style={{ height: 1, background: "rgba(255,255,255,0.08)", marginBottom: 16 }} />
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {/* Negotiation Type Badge */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Auction Type</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: "rgba(255,149,0,0.12)", border: "1px solid rgba(255,149,0,0.25)", color: "#ff9500" }}>
+                      {meta.label}
+                    </span>
+                  </div>
+
+                  {auction.dealName && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ fontSize: 10, textTransform: "uppercase", color: "hsl(var(--muted-foreground))", fontWeight: 700, letterSpacing: "0.05em" }}>Deal Title</span>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{auction.dealName}</div>
+                    </div>
+                  )}
+
+                  {auction.dealDesc && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ fontSize: 10, textTransform: "uppercase", color: "hsl(var(--muted-foreground))", fontWeight: 700, letterSpacing: "0.05em" }}>Description</span>
+                      <div style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", lineHeight: 1.4 }}>
+                        {auction.dealDesc}
+                      </div>
+                    </div>
+                  )}
+
+                  {auction.selectedTerms && auction.selectedTerms.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ fontSize: 10, textTransform: "uppercase", color: "hsl(var(--muted-foreground))", fontWeight: 700, letterSpacing: "0.05em" }}>Deal Terms</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                        {auction.selectedTerms.map((t: string) => (
+                          <span key={t} style={{ fontSize: 11, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", padding: "2px 8px", borderRadius: 6, color: "hsl(var(--foreground))" }}>
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dashboard Fields */}
+                  {meta.dashboardFields && meta.dashboardFields.length > 0 && auction.metadata && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+                      <span style={{ fontSize: 10, textTransform: "uppercase", color: "hsl(var(--muted-foreground))", fontWeight: 700, letterSpacing: "0.05em" }}>Industry Profile</span>
+                      <div style={{ background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: 12, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                        {meta.dashboardFields.map((field: any) => {
+                          const val = auction.metadata?.[field.key];
+                          if (!val) return null;
+                          return (
+                            <div key={field.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
+                              <span style={{ color: "hsl(var(--muted-foreground))" }}>{field.label}</span>
+                              <span style={{ fontWeight: 600, color: "hsl(var(--foreground))" }}>{val}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Creator / Seller */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
+                    <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>Seller</span>
+                    <span style={{ fontSize: 12, fontFamily: "monospace", color: "hsl(var(--foreground))", opacity: 0.8 }}>
+                      {auction.seller?.address ? `${auction.seller.address.slice(0, 8)}…${auction.seller.address.slice(-4)}` : "Seller"}
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
