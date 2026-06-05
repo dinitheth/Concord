@@ -168,13 +168,14 @@ contract MultiPartyAuction {
         require(auction.status == AuctionStatus.BiddingOpen, "Auction not accepting bids");
         require(block.timestamp <= auction.deadline, "Bidding period has ended");
         require(msg.sender != auction.seller, "Seller cannot bid on own auction");
-        require(bids[auctionId].length < auction.maxBidders, "Max bidders reached");
-
         // Check bidder hasn't already submitted
         Bid[] storage existingBids = bids[auctionId];
         for (uint256 i = 0; i < existingBids.length; i++) {
             require(existingBids[i].bidder != msg.sender, "Already submitted a bid");
         }
+
+        require(bids[auctionId].length < auction.maxBidders, "Max bidders reached");
+
 
         euint64 encPrice = FHE.asEuint64(encCeiling);
         FHE.allowSender(encPrice);
